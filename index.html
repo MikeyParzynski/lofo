@@ -743,6 +743,56 @@
     .leaderboard-name { flex: 1; font-size: 14px; font-weight: 600; }
     .leaderboard-score { font-size: 14px; font-weight: 700; color: var(--green); }
 
+    /* Avatar picker */
+    .avatar-section { padding: 0 20px 20px; }
+    .avatar-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .avatar-section .avatar-sub { font-size: 12px; color: var(--text-light); margin-bottom: 14px; }
+    .avatar-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+    }
+    .avatar-option {
+      position: relative; display: flex; flex-direction: column;
+      align-items: center; padding: 10px 4px 8px;
+      border-radius: 14px; border: 2px solid var(--border);
+      background: white; cursor: pointer; transition: all 0.2s;
+    }
+    .avatar-option.selected {
+      border-color: var(--green); background: var(--green-light);
+      box-shadow: 0 0 0 2px rgba(74,124,89,0.2);
+    }
+    .avatar-option.locked {
+      opacity: 0.35; cursor: not-allowed;
+      background: #F5F2ED;
+    }
+    .avatar-option .av-emoji { font-size: 28px; }
+    .avatar-option .av-name {
+      font-size: 9px; font-weight: 600; margin-top: 4px;
+      text-align: center; line-height: 1.2;
+      color: var(--text);
+    }
+    .avatar-option .av-lock {
+      position: absolute; top: 4px; right: 4px; font-size: 10px;
+    }
+    .avatar-option .av-new {
+      position: absolute; top: -4px; right: -4px;
+      background: var(--orange); color: white;
+      font-size: 8px; font-weight: 800;
+      padding: 2px 5px; border-radius: 6px;
+    }
+    /* Map avatar marker */
+    .user-avatar-marker {
+      display: flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: white; border: 3px solid var(--green);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      font-size: 22px;
+      animation: avatarPulse 3s ease-in-out infinite;
+    }
+    @keyframes avatarPulse {
+      0%, 100% { box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+      50% { box-shadow: 0 2px 10px rgba(0,0,0,0.2), 0 0 16px rgba(74,124,89,0.4); }
+    }
+
     /* Discord banner */
     .discord-btn {
       display: flex; align-items: center; justify-content: center; gap: 10px;
@@ -944,16 +994,30 @@
     };
 
     const BADGES = [
-      { icon: '🌱', name: 'First Find', desc: 'Found your first forage spot' },
-      { icon: '🗺️', name: 'Trailblazer', desc: 'Added 5 new spots' },
-      { icon: '🚶', name: 'Wanderer', desc: 'Walked 10 miles foraging' },
-      { icon: '🍋', name: 'Citrus Scout', desc: 'Found 10 citrus trees' },
-      { icon: '🫖', name: 'Tea Time', desc: 'Foraged 5 tea plants' },
-      { icon: '🌸', name: 'Petal Pusher', desc: 'Found 10 flower spots' },
-      { icon: '🎁', name: 'Good Neighbor', desc: 'Shared from your yard' },
-      { icon: '👀', name: 'Eagle Eye', desc: 'Reported 5 corrections' },
-      { icon: '🏆', name: 'LoFo Legend', desc: 'All badges earned' },
+      { icon: '🌱', name: 'First Find', desc: 'Found your first forage spot', unlock: 'sprout' },
+      { icon: '🗺️', name: 'Trailblazer', desc: 'Added 5 new spots', unlock: 'explorer' },
+      { icon: '🚶', name: 'Wanderer', desc: 'Walked 10 miles foraging', unlock: 'hiker' },
+      { icon: '🍋', name: 'Citrus Scout', desc: 'Found 10 citrus trees', unlock: 'citrus' },
+      { icon: '🫖', name: 'Tea Time', desc: 'Foraged 5 tea plants', unlock: 'herbalist' },
+      { icon: '🌸', name: 'Petal Pusher', desc: 'Found 10 flower spots', unlock: 'fairy' },
+      { icon: '🎁', name: 'Good Neighbor', desc: 'Shared from your yard', unlock: 'gardener' },
+      { icon: '👀', name: 'Eagle Eye', desc: 'Reported 5 corrections', unlock: 'owl' },
+      { icon: '🏆', name: 'LoFo Legend', desc: 'All badges earned', unlock: 'legend' },
     ];
+
+    // Unlockable forager avatars — your character on the map!
+    const FORAGER_AVATARS = {
+      seedling:  { emoji: '🌱', name: 'Seedling', desc: 'Everyone starts here', locked: false },
+      sprout:    { emoji: '🌿', name: 'Sprout', desc: 'Unlock: First Find badge' },
+      explorer:  { emoji: '🧭', name: 'Explorer', desc: 'Unlock: Trailblazer badge' },
+      hiker:     { emoji: '🥾', name: 'Hiker', desc: 'Unlock: Wanderer badge' },
+      citrus:    { emoji: '🍊', name: 'Citrus Ranger', desc: 'Unlock: Citrus Scout badge' },
+      herbalist: { emoji: '🧪', name: 'Herbalist', desc: 'Unlock: Tea Time badge' },
+      fairy:     { emoji: '🧚', name: 'Forest Fairy', desc: 'Unlock: Petal Pusher badge' },
+      gardener:  { emoji: '👩‍🌾', name: 'Gardener', desc: 'Unlock: Good Neighbor badge' },
+      owl:       { emoji: '🦉', name: 'Wise Owl', desc: 'Unlock: Eagle Eye badge' },
+      legend:    { emoji: '👑', name: 'LoFo Royalty', desc: 'Unlock: LoFo Legend badge' },
+    };
 
     // ============================
     // Check if user is already signed in
@@ -1222,13 +1286,9 @@
       navigator.geolocation.watchPosition((pos) => {
         state.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
 
-        // Update user dot on map
-        if (map) {
-          map.eachLayer(layer => {
-            if (layer instanceof L.CircleMarker && layer.options.className === 'user-dot') {
-              layer.setLatLng([state.userLocation.lat, state.userLocation.lng]);
-            }
-          });
+        // Update user avatar on map
+        if (userAvatarMarker) {
+          userAvatarMarker.setLatLng([state.userLocation.lat, state.userLocation.lng]);
         }
 
         // Check nearby in-season spots
@@ -2027,6 +2087,81 @@
     }
 
     // ============================
+    // Forager Avatars
+    // ============================
+    function getSelectedAvatar() {
+      return localStorage.getItem('lofo_avatar') || 'seedling';
+    }
+
+    function setSelectedAvatar(avatarKey) {
+      if (!isAvatarUnlocked(avatarKey)) return;
+      localStorage.setItem('lofo_avatar', avatarKey);
+      updateUserMarker();
+      showToast(`Now foraging as ${FORAGER_AVATARS[avatarKey].name} ${FORAGER_AVATARS[avatarKey].emoji}`);
+    }
+
+    function getUnlockedAvatars() {
+      const earned = getEarnedBadgeIcons();
+      const unlocked = ['seedling']; // always available
+      BADGES.forEach(b => {
+        if (earned.includes(b.icon) && b.unlock) {
+          unlocked.push(b.unlock);
+        }
+      });
+      return unlocked;
+    }
+
+    function isAvatarUnlocked(avatarKey) {
+      return getUnlockedAvatars().includes(avatarKey);
+    }
+
+    function getEarnedBadgeIcons() {
+      const spotsAdded = state.spots.filter(s => s.user_id === state.user?.id).length;
+      const streak = getStreak();
+      const earned = [];
+      if (spotsAdded >= 1) earned.push('🌱');
+      if (spotsAdded >= 5) earned.push('🗺️');
+      if (streak.count >= 7) earned.push('🔥');
+      // Count category-specific
+      const fruitSpots = state.spots.filter(s => s.user_id === state.user?.id && s.category === 'fruit').length;
+      const herbSpots = state.spots.filter(s => s.user_id === state.user?.id && s.category === 'herb').length;
+      const flowerSpots = state.spots.filter(s => s.user_id === state.user?.id && s.category === 'flower').length;
+      if (fruitSpots >= 10) earned.push('🍋');
+      if (herbSpots >= 5) earned.push('🫖');
+      if (flowerSpots >= 10) earned.push('🌸');
+      return earned;
+    }
+
+    let userAvatarMarker = null;
+
+    function updateUserMarker() {
+      if (!map) return;
+      const avatarKey = getSelectedAvatar();
+      const avatar = FORAGER_AVATARS[avatarKey] || FORAGER_AVATARS.seedling;
+
+      // Remove old markers (both circle and avatar)
+      if (userAvatarMarker) { map.removeLayer(userAvatarMarker); userAvatarMarker = null; }
+      map.eachLayer(layer => {
+        if (layer instanceof L.CircleMarker && layer.options.className === 'user-dot') {
+          map.removeLayer(layer);
+        }
+      });
+
+      // Create avatar marker
+      const icon = L.divIcon({
+        className: '',
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+        html: `<div class="user-avatar-marker">${avatar.emoji}</div>`,
+      });
+
+      userAvatarMarker = L.marker(
+        [state.userLocation.lat, state.userLocation.lng],
+        { icon, zIndexOffset: 500 }
+      ).addTo(map);
+    }
+
+    // ============================
     // Map
     // ============================
     function initMap() {
@@ -2053,12 +2188,8 @@
           maxZoom: 19,
         }).addTo(map);
 
-        // User location marker
-        L.circleMarker([state.userLocation.lat, state.userLocation.lng], {
-          radius: 8, color: '#4A90D9', fillColor: '#4A90D9',
-          fillOpacity: 1, weight: 3, opacity: 1,
-          className: 'user-dot',
-        }).addTo(map);
+        // User avatar marker
+        updateUserMarker();
 
         // Listen for map clicks when adding
         map.on('click', (e) => {
@@ -2630,10 +2761,7 @@
       const leaderboard = getLeaderboard();
       const foragers = getUniqueForagers().filter(f => f.id !== state.user?.id);
       const followingCount = getFollowing().length;
-      const earnedBadges = [];
-      if (spotsAdded >= 1) earnedBadges.push('🌱');
-      if (spotsAdded >= 5) earnedBadges.push('🗺️');
-      if (streak.count >= 7) earnedBadges.push('🔥');
+      const earnedBadges = getEarnedBadgeIcons();
 
       return `
         <div class="profile-screen">
@@ -2704,16 +2832,40 @@
             </div>
           ` : ''}
 
+          <div class="avatar-section">
+            <h3>🎭 Your Forager Avatar</h3>
+            <p class="avatar-sub">Earn badges to unlock new characters. Your pick shows on the map!</p>
+            <div class="avatar-grid">
+              ${Object.entries(FORAGER_AVATARS).map(([key, av]) => {
+                const unlocked = isAvatarUnlocked(key);
+                const selected = getSelectedAvatar() === key;
+                const badge = BADGES.find(b => b.unlock === key);
+                const justUnlocked = unlocked && key !== 'seedling' && !localStorage.getItem('lofo_seen_' + key);
+                return `
+                  <div class="avatar-option ${selected ? 'selected' : ''} ${!unlocked ? 'locked' : ''}"
+                       data-avatar="${key}" ${!unlocked ? 'title="' + av.desc + '"' : ''}>
+                    ${!unlocked ? '<span class="av-lock">🔒</span>' : ''}
+                    ${justUnlocked ? '<span class="av-new">NEW</span>' : ''}
+                    <span class="av-emoji">${av.emoji}</span>
+                    <span class="av-name">${av.name}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
           <div class="badges-section">
-            <h3>Badges</h3>
+            <h3>Badges & Unlocks</h3>
             ${BADGES.map(b => {
               const earned = earnedBadges.includes(b.icon);
+              const avatarUnlock = FORAGER_AVATARS[b.unlock];
               return `
                 <div class="badge-item ${earned ? 'earned' : 'locked'}">
                   <span class="badge-icon">${b.icon}</span>
                   <div>
                     <div class="badge-name">${b.name}</div>
                     <div class="badge-desc">${b.desc}</div>
+                    ${avatarUnlock ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">Unlocks: ${avatarUnlock.emoji} ${avatarUnlock.name}</div>` : ''}
                   </div>
                   ${earned ? '<span class="badge-earned">Earned!</span>' : ''}
                 </div>
@@ -2991,6 +3143,22 @@
       });
       document.getElementById('username-input')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') document.getElementById('username-save')?.click();
+      });
+
+      // Avatar picker
+      document.querySelectorAll('.avatar-option:not(.locked)').forEach(opt => {
+        opt.addEventListener('click', () => {
+          const key = opt.dataset.avatar;
+          setSelectedAvatar(key);
+          // Mark as seen
+          localStorage.setItem('lofo_seen_' + key, '1');
+          // Update UI
+          document.querySelectorAll('.avatar-option').forEach(o => o.classList.remove('selected'));
+          opt.classList.add('selected');
+          // Remove NEW badge
+          const newBadge = opt.querySelector('.av-new');
+          if (newBadge) newBadge.remove();
+        });
       });
 
       // Follow buttons
