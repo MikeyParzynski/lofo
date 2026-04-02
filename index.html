@@ -779,6 +779,41 @@
       font-size: 8px; font-weight: 800;
       padding: 2px 5px; border-radius: 6px;
     }
+    /* Navigation mode */
+    .nav-banner {
+      position: absolute; top: 50px; left: 12px; right: 12px; z-index: 1200;
+      background: white; border-radius: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+      overflow: hidden;
+      animation: slideDown 0.3s ease-out;
+    }
+    .nav-banner-top {
+      background: linear-gradient(135deg, var(--green-dark), var(--green));
+      padding: 16px 18px; color: white;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .nav-banner-icon { font-size: 28px; }
+    .nav-banner-info { flex: 1; }
+    .nav-banner-dest { font-size: 16px; font-weight: 700; }
+    .nav-banner-eta { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+    .nav-banner-close {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(255,255,255,0.2); border: none;
+      color: white; font-size: 16px; cursor: pointer;
+    }
+    .nav-banner-steps {
+      padding: 12px 18px; max-height: 120px; overflow-y: auto;
+    }
+    .nav-step {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 8px 0; font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-step:last-child { border-bottom: none; }
+    .nav-step-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .nav-step-text { line-height: 1.4; }
+    .nav-step-dist { color: var(--text-light); font-size: 11px; margin-top: 2px; }
+
     /* Map avatar marker */
     .user-avatar-marker {
       display: flex; align-items: center; justify-content: center;
@@ -1947,15 +1982,259 @@
 
       document.getElementById('route-exit')?.addEventListener('click', exitRouteMode);
       document.getElementById('route-go')?.addEventListener('click', () => {
-        // Open Google Maps with waypoints
         if (routeSpots.length < 2) return;
-        const origin = `${routeSpots[0].lat},${routeSpots[0].lng}`;
-        const destination = `${routeSpots[routeSpots.length-1].lat},${routeSpots[routeSpots.length-1].lng}`;
-        const waypoints = routeSpots.slice(1, -1).map(s => `${s.lat},${s.lng}`).join('|');
-        let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=walking`;
-        if (waypoints) url += `&waypoints=${waypoints}`;
-        window.open(url, '_blank');
+        const spotsToNavigate = [...routeSpots];
+        exitRouteMode();
+        navigateMultiStop(spotsToNavigate);
       });
+    }
+
+    // ============================
+    // In-App Navigation (OSRM)
+    // ============================
+    let navRouteLine = null;
+    let navActive = false;
+    let navDestinationMarker = null;
+
+    async function navigateToSpot(spot) {
+      // Close detail sheet
+      state.selectedSpot = null;
+      state.comments = [];
+      state.harvests = [];
+      const container = document.getElementById('detail-container');
+      if (container) container.innerHTML = '';
+
+      // Hide search/filter bars
+      document.querySelector('.search-bar')?.style && (document.querySelector('.search-bar').style.display = 'none');
+      document.querySelector('.filter-bar')?.style && (document.querySelector('.filter-bar').style.display = 'none');
+      document.querySelector('.spot-count')?.style && (document.querySelector('.spot-count').style.display = 'none');
+      document.getElementById('seasonal-feed-container')?.style && (document.getElementById('seasonal-feed-container').style.display = 'none');
+
+      navActive = true;
+      showToast('Getting directions... 🗺️');
+
+      // Get current position
+      let startLat = state.userLocation.lat;
+      let startLng = state.userLocation.lng;
+      try {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000 });
+        });
+        startLat = pos.coords.latitude;
+        startLng = pos.coords.longitude;
+        state.userLocation = { lat: startLat, lng: startLng };
+      } catch (e) { /* use last known */ }
+
+      try {
+        // OSRM walking route (free, no API key)
+        const url = `https://router.project-osrm.org/route/v1/foot/${startLng},${startLat};${spot.lng},${spot.lat}?overview=full&geometries=geojson&steps=true`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+
+        if (data.code !== 'Ok' || !data.routes || !data.routes[0]) {
+          showToast('Could not find a walking route');
+          clearNavigation();
+          return;
+        }
+
+        const route = data.routes[0];
+        const coords = route.geometry.coordinates.map(c => [c[1], c[0]]); // flip lng,lat to lat,lng
+        const totalDist = route.distance; // meters
+        const totalTime = route.duration; // seconds
+
+        // Draw route line
+        if (navRouteLine) map.removeLayer(navRouteLine);
+        navRouteLine = L.polyline(coords, {
+          color: '#4A7C59',
+          weight: 6,
+          opacity: 0.85,
+          lineJoin: 'round',
+          lineCap: 'round',
+        }).addTo(map);
+
+        // Add destination pulse
+        if (navDestinationMarker) map.removeLayer(navDestinationMarker);
+        const cat = CATEGORIES[spot.category] || CATEGORIES.other;
+        navDestinationMarker = L.marker([spot.lat, spot.lng], {
+          icon: L.divIcon({
+            className: '',
+            iconSize: [48, 48],
+            iconAnchor: [24, 24],
+            html: `<div style="width:48px;height:48px;border-radius:50%;background:white;border:3px solid ${cat.pinColor};display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 2px 12px rgba(0,0,0,0.2);animation:avatarPulse 2s ease-in-out infinite">${cat.icon}</div>`,
+          }),
+          zIndexOffset: 600,
+        }).addTo(map);
+
+        // Fit map to show entire route
+        map.fitBounds(navRouteLine.getBounds(), { padding: [80, 60] });
+
+        // Parse turn-by-turn steps
+        const steps = route.legs[0]?.steps || [];
+        const navSteps = steps.filter(s => s.maneuver && s.distance > 5).map(s => {
+          const type = s.maneuver.type || '';
+          const modifier = s.maneuver.modifier || '';
+          let icon = '➡️';
+          if (type === 'depart') icon = '🚶';
+          else if (type === 'arrive') icon = '📍';
+          else if (modifier.includes('left')) icon = '⬅️';
+          else if (modifier.includes('right')) icon = '➡️';
+          else if (modifier.includes('straight')) icon = '⬆️';
+          else if (type === 'turn') icon = '↪️';
+          else if (type === 'roundabout') icon = '🔄';
+
+          const distText = s.distance > 1000 ? `${(s.distance/1000).toFixed(1)} km` : `${Math.round(s.distance)} m`;
+          const streetName = s.name || '';
+          let instruction = s.maneuver.type === 'depart' ? 'Start walking' :
+                           s.maneuver.type === 'arrive' ? `Arrive at ${spot.plant_name}` :
+                           `${modifier ? modifier.charAt(0).toUpperCase() + modifier.slice(1) : 'Continue'}${streetName ? ' on ' + streetName : ''}`;
+
+          return { icon, instruction, distance: distText };
+        });
+
+        // Show nav banner
+        renderNavBanner(spot, totalDist, totalTime, navSteps);
+
+      } catch (err) {
+        showToast('Navigation error — check your connection');
+        clearNavigation();
+      }
+    }
+
+    async function navigateMultiStop(spots) {
+      if (spots.length < 2) return;
+
+      // Hide UI
+      document.querySelector('.search-bar')?.style && (document.querySelector('.search-bar').style.display = 'none');
+      document.querySelector('.filter-bar')?.style && (document.querySelector('.filter-bar').style.display = 'none');
+      document.querySelector('.spot-count')?.style && (document.querySelector('.spot-count').style.display = 'none');
+      document.getElementById('seasonal-feed-container')?.style && (document.getElementById('seasonal-feed-container').style.display = 'none');
+
+      navActive = true;
+      showToast('Mapping your route... 🗺️');
+
+      let startLat = state.userLocation.lat;
+      let startLng = state.userLocation.lng;
+      try {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000 });
+        });
+        startLat = pos.coords.latitude;
+        startLng = pos.coords.longitude;
+      } catch (e) {}
+
+      // Build waypoints string: start -> spot1 -> spot2 -> ... -> last spot
+      const waypoints = [
+        `${startLng},${startLat}`,
+        ...spots.map(s => `${s.lng},${s.lat}`)
+      ].join(';');
+
+      try {
+        const url = `https://router.project-osrm.org/route/v1/foot/${waypoints}?overview=full&geometries=geojson&steps=true`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+
+        if (data.code !== 'Ok' || !data.routes?.[0]) {
+          showToast('Could not find a walking route');
+          clearNavigation();
+          return;
+        }
+
+        const route = data.routes[0];
+        const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+
+        if (navRouteLine) map.removeLayer(navRouteLine);
+        navRouteLine = L.polyline(coords, {
+          color: '#4A7C59', weight: 6, opacity: 0.85,
+          lineJoin: 'round', lineCap: 'round',
+        }).addTo(map);
+
+        map.fitBounds(navRouteLine.getBounds(), { padding: [80, 60] });
+
+        const totalDist = route.distance;
+        const totalTime = route.duration;
+        const lastSpot = spots[spots.length - 1];
+
+        // Collect steps from all legs
+        const allSteps = [];
+        route.legs.forEach((leg, legIdx) => {
+          if (legIdx > 0) {
+            const stopSpot = spots[legIdx - 1];
+            const cat = CATEGORIES[stopSpot.category] || CATEGORIES.other;
+            allSteps.push({ icon: cat.icon, instruction: `Stop ${legIdx}: ${stopSpot.plant_name}`, distance: '' });
+          }
+          leg.steps.filter(s => s.distance > 5).forEach(s => {
+            const modifier = s.maneuver.modifier || '';
+            let icon = '➡️';
+            if (s.maneuver.type === 'depart') icon = '🚶';
+            else if (s.maneuver.type === 'arrive') icon = '📍';
+            else if (modifier.includes('left')) icon = '⬅️';
+            else if (modifier.includes('right')) icon = '➡️';
+            else if (modifier.includes('straight')) icon = '⬆️';
+            const distText = s.distance > 1000 ? `${(s.distance/1000).toFixed(1)} km` : `${Math.round(s.distance)} m`;
+            const streetName = s.name || '';
+            let instruction = s.maneuver.type === 'depart' ? 'Start walking' :
+                             s.maneuver.type === 'arrive' ? `Arrive at ${lastSpot.plant_name}` :
+                             `${modifier ? modifier.charAt(0).toUpperCase() + modifier.slice(1) : 'Continue'}${streetName ? ' on ' + streetName : ''}`;
+            allSteps.push({ icon, instruction, distance: distText });
+          });
+        });
+
+        renderNavBanner(lastSpot, totalDist, totalTime, allSteps, spots.length);
+
+      } catch (err) {
+        showToast('Navigation error — check your connection');
+        clearNavigation();
+      }
+    }
+
+    function renderNavBanner(spot, totalDist, totalTime, steps, stopCount) {
+      document.getElementById('nav-banner')?.remove();
+
+      const distText = totalDist > 1000 ? `${(totalDist/1000).toFixed(1)} km` : `${Math.round(totalDist)} m`;
+      const mins = Math.max(1, Math.round(totalTime / 60));
+      const cat = CATEGORIES[spot?.category] || CATEGORIES.other;
+
+      const banner = document.createElement('div');
+      banner.className = 'nav-banner';
+      banner.id = 'nav-banner';
+      banner.innerHTML = `
+        <div class="nav-banner-top">
+          <div class="nav-banner-icon">${cat.icon}</div>
+          <div class="nav-banner-info">
+            <div class="nav-banner-dest">${stopCount ? `${stopCount}-stop route` : spot?.plant_name || 'Destination'}</div>
+            <div class="nav-banner-eta">${distText} · ~${mins} min walk</div>
+          </div>
+          <button class="nav-banner-close" id="nav-close">✕</button>
+        </div>
+        ${steps.length > 0 ? `
+          <div class="nav-banner-steps">
+            ${steps.slice(0, 15).map(s => `
+              <div class="nav-step">
+                <span class="nav-step-icon">${s.icon}</span>
+                <div>
+                  <div class="nav-step-text">${s.instruction}</div>
+                  ${s.distance ? `<div class="nav-step-dist">${s.distance}</div>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      `;
+      document.body.appendChild(banner);
+
+      document.getElementById('nav-close')?.addEventListener('click', clearNavigation);
+    }
+
+    function clearNavigation() {
+      navActive = false;
+      if (navRouteLine && map) { map.removeLayer(navRouteLine); navRouteLine = null; }
+      if (navDestinationMarker && map) { map.removeLayer(navDestinationMarker); navDestinationMarker = null; }
+      document.getElementById('nav-banner')?.remove();
+      // Show UI again
+      document.querySelector('.search-bar')?.style && (document.querySelector('.search-bar').style.display = '');
+      document.querySelector('.filter-bar')?.style && (document.querySelector('.filter-bar').style.display = '');
+      document.querySelector('.spot-count')?.style && (document.querySelector('.spot-count').style.display = '');
+      document.getElementById('seasonal-feed-container')?.style && (document.getElementById('seasonal-feed-container').style.display = '');
     }
 
     // ============================
@@ -2990,11 +3269,10 @@
         });
       });
 
-      // Directions
+      // Directions (in-app navigation)
       document.getElementById('action-directions')?.addEventListener('click', () => {
         if (state.selectedSpot) {
-          const url = `https://www.google.com/maps/dir/?api=1&destination=${state.selectedSpot.lat},${state.selectedSpot.lng}&travelmode=walking`;
-          window.open(url, '_blank');
+          navigateToSpot(state.selectedSpot);
         }
       });
 
