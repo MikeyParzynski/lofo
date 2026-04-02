@@ -498,6 +498,134 @@
     .toast.hidden { display: none; }
     @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+    /* Plant Info Card */
+    .plant-card-screen {
+      position: fixed; inset: 0; z-index: 3500;
+      background: var(--cream); overflow-y: auto;
+      animation: slideUp 0.3s ease-out;
+    }
+    .plant-card-hero {
+      position: relative; height: 280px; overflow: hidden;
+    }
+    .plant-card-hero img {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+    .plant-card-hero-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%);
+    }
+    .plant-card-back {
+      position: absolute; top: 44px; left: 16px;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
+      border: none; color: white; font-size: 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .plant-card-confidence {
+      position: absolute; top: 44px; right: 16px;
+      padding: 6px 14px; border-radius: 20px;
+      background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
+      color: white; font-size: 13px; font-weight: 600;
+    }
+    .plant-card-hero-info {
+      position: absolute; bottom: 20px; left: 20px; right: 20px; color: white;
+    }
+    .plant-card-hero-info h1 {
+      font-size: 28px; font-weight: 800; margin-bottom: 4px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .plant-card-hero-info .scientific {
+      font-size: 15px; font-style: italic; opacity: 0.85;
+    }
+    .plant-card-hero-info .family-badge {
+      display: inline-block; margin-top: 8px;
+      padding: 4px 12px; border-radius: 12px;
+      background: rgba(255,255,255,0.2); backdrop-filter: blur(4px);
+      font-size: 12px; font-weight: 600;
+    }
+    .plant-card-body { padding: 24px 20px 120px; }
+    .plant-card-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+    .plant-card-tag {
+      padding: 6px 14px; border-radius: 12px;
+      font-size: 13px; font-weight: 600;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .plant-card-tag.edible { background: var(--safe-bg); color: var(--safe); }
+    .plant-card-tag.caution { background: var(--caution-bg); color: var(--caution); }
+    .plant-card-tag.toxic { background: var(--danger-bg); color: var(--danger); }
+    .plant-card-tag.medicinal { background: #E8E0F5; color: #7B61B8; }
+    .plant-card-tag.ornamental { background: var(--pink-light); color: var(--pink); }
+    .plant-card-section {
+      margin-bottom: 20px; padding: 16px; border-radius: 16px;
+      background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .plant-card-section h3 {
+      font-size: 14px; font-weight: 700; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .plant-card-section p {
+      font-size: 14px; line-height: 1.7; color: var(--text);
+    }
+    .plant-card-section ul {
+      list-style: none; padding: 0; margin: 0;
+    }
+    .plant-card-section ul li {
+      padding: 6px 0; font-size: 14px; line-height: 1.5;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+    .plant-card-section ul li:last-child { border-bottom: none; }
+    .plant-card-next {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      padding: 16px 20px; padding-bottom: max(16px, env(safe-area-inset-bottom));
+      background: white; border-top: 1px solid var(--border);
+      z-index: 3501;
+    }
+    .plant-card-next-btn {
+      width: 100%; padding: 16px; border-radius: 16px; border: none;
+      background: var(--green); color: white;
+      font-size: 16px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 4px 16px rgba(74,124,89,0.3);
+    }
+    .plant-card-next-btn:active { transform: scale(0.97); }
+    .plant-card-loading {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 60px 20px; text-align: center;
+    }
+    .plant-card-loading .spinner-lg {
+      width: 40px; height: 40px; border: 4px solid var(--border);
+      border-top-color: var(--green); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin-bottom: 16px;
+    }
+
+    /* Route mode */
+    .route-banner {
+      position: absolute; top: 50px; left: 16px; right: 16px; z-index: 1100;
+      background: white; border-radius: 16px; padding: 12px 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .route-banner-info { flex: 1; }
+    .route-banner-title { font-size: 14px; font-weight: 700; color: var(--green-dark); }
+    .route-banner-stats { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+    .route-banner-actions { display: flex; gap: 6px; }
+    .route-banner-actions button {
+      padding: 8px 14px; border-radius: 10px; border: none;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .route-done-btn { background: var(--green); color: white; }
+    .route-clear-btn { background: var(--cream); color: var(--text-light); }
+    .route-marker-badge {
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: var(--green-dark); color: white;
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      z-index: 10;
+    }
+
     /* Loading spinner */
     .spinner {
       width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3);
@@ -655,6 +783,7 @@
       shareSpot: null, // spot being shared
       dismissedAlerts: new Set(), // spot IDs user dismissed
       plantIdResult: null, // result from plant ID API
+      plantInfo: null, // Wikipedia info about identified plant
       identifyingPlant: false, // loading state for plant ID
     };
 
@@ -1139,7 +1268,7 @@
     }
 
     // ============================
-    // Quick Camera Flow
+    // Quick Camera Flow (Camera → Plant Card → Add Form)
     // ============================
     function triggerQuickCamera() {
       const input = document.getElementById('quick-camera-input');
@@ -1153,13 +1282,10 @@
       const file = e.target.files[0];
       if (!file) return;
 
-      showToast('Identifying plant... 🔍');
-
       const reader = new FileReader();
       reader.onload = (ev) => {
         const img = new Image();
         img.onload = () => {
-          // Resize
           const canvas = document.createElement('canvas');
           const maxSize = 800;
           let w = img.width, h = img.height;
@@ -1180,11 +1306,23 @@
             );
           }
 
-          // Try to identify plant, then open form
+          // Show the plant card screen with loading state immediately
+          showPlantCard(null, true);
+
+          // Try to identify plant
           identifyPlant(state.spotPhoto).then(() => {
-            openAddFormWithData();
+            if (state.plantIdResult) {
+              // Fetch Wikipedia info then show card
+              fetchPlantInfo(state.plantIdResult.commonName, state.plantIdResult.scientificName).then(info => {
+                state.plantInfo = info;
+                showPlantCard(state.plantIdResult, false);
+              });
+            } else {
+              // Couldn't identify — go straight to add form
+              showPlantCard(null, false);
+            }
           }).catch(() => {
-            openAddFormWithData();
+            showPlantCard(null, false);
           });
         };
         img.src = ev.target.result;
@@ -1192,13 +1330,236 @@
       reader.readAsDataURL(file);
     }
 
+    // ============================
+    // Wikipedia Plant Info Lookup
+    // ============================
+    async function fetchPlantInfo(commonName, scientificName) {
+      const info = { summary: '', edible: '', uses: [], facts: [], medicinal: '' };
+      try {
+        // Try scientific name first (more accurate), then common name
+        const searchTerms = [scientificName, commonName].filter(Boolean);
+        let pageData = null;
+
+        for (const term of searchTerms) {
+          const searchUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(term)}`;
+          const resp = await fetch(searchUrl);
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.extract && data.extract.length > 50) {
+              pageData = data;
+              break;
+            }
+          }
+          // Try search API as fallback
+          const searchResp = await fetch(`https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(term)}&limit=1&format=json&origin=*`);
+          if (searchResp.ok) {
+            const searchData = await searchResp.json();
+            if (searchData[1] && searchData[1][0]) {
+              const pageResp = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(searchData[1][0])}`);
+              if (pageResp.ok) {
+                pageData = await pageResp.json();
+                if (pageData.extract && pageData.extract.length > 50) break;
+              }
+            }
+          }
+        }
+
+        if (pageData?.extract) {
+          info.summary = pageData.extract;
+
+          // Parse edibility from text
+          const text = pageData.extract.toLowerCase();
+          if (text.includes('edible') || text.includes('eaten') || text.includes('food') || text.includes('culinary') || text.includes('cooking') || text.includes('eaten raw')) {
+            info.edible = 'edible';
+          } else if (text.includes('toxic') || text.includes('poison') || text.includes('harmful') || text.includes('dangerous')) {
+            info.edible = 'toxic';
+          } else if (text.includes('medicin') || text.includes('herbal') || text.includes('remedy')) {
+            info.edible = 'medicinal';
+          }
+
+          // Extract uses
+          if (text.includes('tea') || text.includes('infusion')) info.uses.push('Tea & infusions');
+          if (text.includes('cook') || text.includes('recipe') || text.includes('culinary')) info.uses.push('Cooking');
+          if (text.includes('jam') || text.includes('preserve') || text.includes('jelly')) info.uses.push('Jams & preserves');
+          if (text.includes('salad') || text.includes('raw')) info.uses.push('Salads');
+          if (text.includes('medicin') || text.includes('remedy') || text.includes('treat')) info.uses.push('Traditional medicine');
+          if (text.includes('ornament') || text.includes('decorat') || text.includes('garden')) info.uses.push('Ornamental');
+          if (text.includes('dye') || text.includes('fiber') || text.includes('craft')) info.uses.push('Crafts & dyes');
+          if (text.includes('essential oil') || text.includes('fragran') || text.includes('perfum')) info.uses.push('Aromatherapy');
+
+          // Extract interesting facts
+          const sentences = pageData.extract.split(/\.\s+/);
+          for (const s of sentences) {
+            if (s.length > 30 && s.length < 200) {
+              const lower = s.toLowerCase();
+              if (lower.includes('native to') || lower.includes('origin') || lower.includes('found in') || lower.includes('grows in')) {
+                info.facts.push(s.trim() + '.');
+              } else if (lower.includes('also known') || lower.includes('commonly called') || lower.includes('sometimes called')) {
+                info.facts.push(s.trim() + '.');
+              } else if (lower.includes('century') || lower.includes('ancient') || lower.includes('traditional') || lower.includes('history')) {
+                info.facts.push(s.trim() + '.');
+              } else if (lower.includes('species') || lower.includes('family') || lower.includes('genus')) {
+                info.facts.push(s.trim() + '.');
+              }
+            }
+          }
+          // Limit facts to 3
+          info.facts = info.facts.slice(0, 3);
+          if (info.facts.length === 0 && sentences.length > 1) {
+            info.facts.push(sentences[0].trim() + '.');
+          }
+        }
+      } catch (err) {
+        // Silently fail — card will show with basic info
+      }
+      return info;
+    }
+
+    // ============================
+    // Plant Info Card
+    // ============================
+    function showPlantCard(plantResult, isLoading) {
+      // Remove existing card
+      document.getElementById('plant-card-screen')?.remove();
+
+      const screen = document.createElement('div');
+      screen.className = 'plant-card-screen';
+      screen.id = 'plant-card-screen';
+
+      if (isLoading) {
+        screen.innerHTML = `
+          <div class="plant-card-hero" style="background:linear-gradient(135deg, var(--green-dark), var(--green))">
+            ${state.spotPhoto ? `<img src="${state.spotPhoto}" alt="Plant photo">` : ''}
+            <div class="plant-card-hero-overlay"></div>
+            <button class="plant-card-back" id="plant-card-back">\u2190</button>
+          </div>
+          <div class="plant-card-loading">
+            <div class="spinner-lg"></div>
+            <div style="font-size:18px;font-weight:700;color:var(--green-dark);margin-bottom:8px">Identifying plant...</div>
+            <div style="font-size:14px;color:var(--text-light)">Analyzing your photo with PlantNet AI</div>
+          </div>
+        `;
+        document.body.appendChild(screen);
+        document.getElementById('plant-card-back')?.addEventListener('click', closePlantCard);
+        return;
+      }
+
+      if (!plantResult) {
+        // Couldn't identify — show a "manual" card
+        screen.innerHTML = `
+          <div class="plant-card-hero" style="background:linear-gradient(135deg, var(--green-dark), var(--green))">
+            ${state.spotPhoto ? `<img src="${state.spotPhoto}" alt="Plant photo">` : ''}
+            <div class="plant-card-hero-overlay"></div>
+            <button class="plant-card-back" id="plant-card-back">\u2190</button>
+          </div>
+          <div class="plant-card-body">
+            <div style="text-align:center;padding:20px 0">
+              <div style="font-size:48px;margin-bottom:12px">\uD83E\uDD14</div>
+              <h2 style="font-size:22px;font-weight:700;margin-bottom:8px">Hmm, not sure about this one</h2>
+              <p style="font-size:14px;color:var(--text-light);line-height:1.6;max-width:280px;margin:0 auto">
+                Try getting a closer photo of the leaves or flowers. You can still add this spot manually!
+              </p>
+            </div>
+          </div>
+          <div class="plant-card-next">
+            <button class="plant-card-next-btn" id="plant-card-add">Add Spot Manually \u2192</button>
+          </div>
+        `;
+        document.body.appendChild(screen);
+        document.getElementById('plant-card-back')?.addEventListener('click', closePlantCard);
+        document.getElementById('plant-card-add')?.addEventListener('click', () => {
+          document.getElementById('plant-card-screen')?.remove();
+          openAddFormWithData();
+        });
+        return;
+      }
+
+      // We have a plant result — show the full info card
+      const info = state.plantInfo || { summary: '', edible: '', uses: [], facts: [] };
+
+      // Determine edibility tag
+      let edibilityTag = '';
+      if (info.edible === 'edible') {
+        edibilityTag = '<span class="plant-card-tag edible">\u2705 Likely Edible</span>';
+      } else if (info.edible === 'toxic') {
+        edibilityTag = '<span class="plant-card-tag toxic">\u274C Potentially Toxic</span>';
+      } else if (info.edible === 'medicinal') {
+        edibilityTag = '<span class="plant-card-tag medicinal">\uD83D\uDC9C Medicinal</span>';
+      }
+
+      screen.innerHTML = `
+        <div class="plant-card-hero">
+          ${state.spotPhoto ? `<img src="${state.spotPhoto}" alt="${plantResult.commonName}">` : `<div style="height:100%;background:linear-gradient(135deg,var(--green-dark),var(--green))"></div>`}
+          <div class="plant-card-hero-overlay"></div>
+          <button class="plant-card-back" id="plant-card-back">\u2190</button>
+          <div class="plant-card-confidence">\uD83C\uDFAF ${plantResult.score}% match</div>
+          <div class="plant-card-hero-info">
+            <h1>${plantResult.commonName}</h1>
+            <div class="scientific">${plantResult.scientificName}</div>
+            ${plantResult.family ? `<span class="family-badge">\uD83C\uDF3F ${plantResult.family}</span>` : ''}
+          </div>
+        </div>
+        <div class="plant-card-body">
+          <div class="plant-card-tags">
+            ${edibilityTag}
+            ${info.uses.length > 0 ? info.uses.slice(0,3).map(u => `<span class="plant-card-tag" style="background:var(--green-light);color:var(--green)">${u}</span>`).join('') : ''}
+          </div>
+
+          ${info.summary ? `
+            <div class="plant-card-section">
+              <h3>\uD83D\uDCD6 About this plant</h3>
+              <p>${info.summary}</p>
+            </div>
+          ` : ''}
+
+          ${info.uses.length > 0 ? `
+            <div class="plant-card-section">
+              <h3>\u2728 Common Uses</h3>
+              <ul>
+                ${info.uses.map(u => `<li><span>\u2022</span> ${u}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+
+          ${info.facts.length > 0 ? `
+            <div class="plant-card-section">
+              <h3>\uD83D\uDCA1 Did you know?</h3>
+              <ul>
+                ${info.facts.map(f => `<li><span>\uD83C\uDF3F</span> ${f}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+
+          <div class="plant-card-section" style="background:var(--caution-bg);border:1px solid #FFE082">
+            <h3>\u26A0\uFE0F Always Verify</h3>
+            <p style="font-size:13px">AI identification is not 100% accurate. Always cross-reference with a field guide or expert before consuming any wild plant.</p>
+          </div>
+        </div>
+        <div class="plant-card-next">
+          <button class="plant-card-next-btn" id="plant-card-add">Add to Map \uD83D\uDDFA\uFE0F \u2192</button>
+        </div>
+      `;
+      document.body.appendChild(screen);
+
+      document.getElementById('plant-card-back')?.addEventListener('click', closePlantCard);
+      document.getElementById('plant-card-add')?.addEventListener('click', () => {
+        document.getElementById('plant-card-screen')?.remove();
+        openAddFormWithData();
+      });
+    }
+
+    function closePlantCard() {
+      state.plantIdResult = null;
+      state.plantInfo = null;
+      state.spotPhoto = null;
+      document.getElementById('plant-card-screen')?.remove();
+    }
+
     function openAddFormWithData() {
       state.showAddForm = true;
       render();
 
-      // Pre-fill everything after DOM is ready
       setTimeout(() => {
-        // Photo preview
         if (state.spotPhoto) {
           const previewImg = document.getElementById('photo-preview-img');
           const preview = document.getElementById('photo-preview');
@@ -1208,7 +1569,6 @@
           if (placeholder) placeholder.style.display = 'none';
         }
 
-        // Location
         if (state._pendingLat) {
           const latInput = document.getElementById('add-lat');
           const lngInput = document.getElementById('add-lng');
@@ -1216,10 +1576,154 @@
           if (lngInput) lngInput.value = state._pendingLng;
         }
 
-        // Apply plant ID results
         applyPlantIdToForm();
         renderPlantIdStatus();
       }, 150);
+    }
+
+    // ============================
+    // Route Mode (Tap markers to build walking route)
+    // ============================
+    let routeMode = false;
+    let routeSpots = [];
+    let routePolyline = null;
+    let routeMarkerBadges = [];
+
+    function toggleRouteMode() {
+      if (routeMode) {
+        exitRouteMode();
+      } else {
+        enterRouteMode();
+      }
+    }
+
+    function enterRouteMode() {
+      routeMode = true;
+      routeSpots = [];
+      showToast('Tap pins to build your foraging route \uD83D\uDEB6');
+      renderRouteBanner();
+      // Hide search bar and filter bar
+      document.querySelector('.search-bar')?.style && (document.querySelector('.search-bar').style.display = 'none');
+      document.querySelector('.filter-bar')?.style && (document.querySelector('.filter-bar').style.display = 'none');
+      document.querySelector('.spot-count')?.style && (document.querySelector('.spot-count').style.display = 'none');
+    }
+
+    function exitRouteMode() {
+      routeMode = false;
+      routeSpots = [];
+      // Remove route line
+      if (routePolyline && map) { map.removeLayer(routePolyline); routePolyline = null; }
+      // Remove numbered badges
+      routeMarkerBadges.forEach(b => { if (map) map.removeLayer(b); });
+      routeMarkerBadges = [];
+      // Remove banner
+      document.getElementById('route-banner')?.remove();
+      // Show search and filter bars again
+      document.querySelector('.search-bar')?.style && (document.querySelector('.search-bar').style.display = '');
+      document.querySelector('.filter-bar')?.style && (document.querySelector('.filter-bar').style.display = '');
+      document.querySelector('.spot-count')?.style && (document.querySelector('.spot-count').style.display = '');
+    }
+
+    function addSpotToRoute(spot) {
+      if (!routeMode) return;
+
+      // Toggle: if already in route, remove it
+      const idx = routeSpots.findIndex(s => s.id === spot.id);
+      if (idx >= 0) {
+        routeSpots.splice(idx, 1);
+      } else {
+        routeSpots.push(spot);
+      }
+      updateRouteLine();
+      renderRouteBanner();
+    }
+
+    function updateRouteLine() {
+      if (!map) return;
+
+      // Remove old line
+      if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
+      // Remove old badges
+      routeMarkerBadges.forEach(b => map.removeLayer(b));
+      routeMarkerBadges = [];
+
+      if (routeSpots.length < 1) return;
+
+      // Draw polyline
+      const latlngs = routeSpots.map(s => [s.lat, s.lng]);
+      routePolyline = L.polyline(latlngs, {
+        color: '#2D5A3D',
+        weight: 4,
+        opacity: 0.8,
+        dashArray: '10, 8',
+        lineJoin: 'round',
+      }).addTo(map);
+
+      // Add numbered badges to each spot
+      routeSpots.forEach((spot, i) => {
+        const badge = L.marker([spot.lat, spot.lng], {
+          icon: L.divIcon({
+            className: '',
+            iconSize: [22, 22],
+            iconAnchor: [11, 34],
+            html: `<div class="route-marker-badge">${i + 1}</div>`,
+          }),
+          interactive: false,
+          zIndexOffset: 1000,
+        }).addTo(map);
+        routeMarkerBadges.push(badge);
+      });
+
+      // Fit map to route
+      if (routeSpots.length >= 2) {
+        map.fitBounds(routePolyline.getBounds(), { padding: [60, 60] });
+      }
+    }
+
+    function getRouteTotalDistance() {
+      let total = 0;
+      for (let i = 1; i < routeSpots.length; i++) {
+        total += getDistance(routeSpots[i-1].lat, routeSpots[i-1].lng, routeSpots[i].lat, routeSpots[i].lng);
+      }
+      return total;
+    }
+
+    function renderRouteBanner() {
+      document.getElementById('route-banner')?.remove();
+
+      if (!routeMode) return;
+
+      const dist = getRouteTotalDistance();
+      const distText = dist > 1000 ? `${(dist/1000).toFixed(1)} km` : `${Math.round(dist)} m`;
+      const walkTime = Math.max(1, Math.round(dist / 80)); // ~80m/min walking
+
+      const banner = document.createElement('div');
+      banner.className = 'route-banner';
+      banner.id = 'route-banner';
+      banner.innerHTML = `
+        <div style="font-size:24px">\uD83D\uDEB6</div>
+        <div class="route-banner-info">
+          <div class="route-banner-title">${routeSpots.length === 0 ? 'Tap pins to add to route' : `${routeSpots.length} stop${routeSpots.length > 1 ? 's' : ''}`}</div>
+          <div class="route-banner-stats">${routeSpots.length >= 2 ? `${distText} \u00B7 ~${walkTime} min walk` : 'Add at least 2 stops'}</div>
+        </div>
+        <div class="route-banner-actions">
+          ${routeSpots.length >= 2 ? '<button class="route-done-btn" id="route-go">\uD83D\uDDFA\uFE0F Go</button>' : ''}
+          <button class="route-clear-btn" id="route-exit">\u2715</button>
+        </div>
+      `;
+      document.body.appendChild(banner);
+
+      document.getElementById('route-exit')?.addEventListener('click', exitRouteMode);
+      document.getElementById('route-go')?.addEventListener('click', () => {
+        // Open Google Maps with waypoints
+        if (routeSpots.length < 2) return;
+        const origin = `${routeSpots[0].lat},${routeSpots[0].lng}`;
+        const destination = `${routeSpots[routeSpots.length-1].lat},${routeSpots[routeSpots.length-1].lng}`;
+        const waypoints = routeSpots.slice(1, -1).map(s => `${s.lat},${s.lng}`).join('|');
+        let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=walking`;
+        if (waypoints) url += `&waypoints=${waypoints}`;
+        window.open(url, '_blank');
+      });
     }
 
     // ============================
@@ -1362,10 +1866,14 @@
         const marker = L.marker([spot.lat, spot.lng], { icon })
           .addTo(map)
           .on('click', () => {
+            // Route mode: add/remove spot from route
+            if (routeMode) {
+              addSpotToRoute(spot);
+              return;
+            }
             state.selectedSpot = spot;
             loadComments(spot.id);
             loadHarvests(spot.id);
-            // Render detail into container without full re-render
             const container = document.getElementById('detail-container');
             if (container) {
               container.innerHTML = renderDetailOverlay();
@@ -1408,7 +1916,6 @@
           ${renderSearchBar()}
           <div class="spot-count" id="spot-count">${getFilteredSpots().length} spots nearby</div>
           ${renderFilterBar()}
-          <button class="fab" id="fab-add" title="Add spot">+</button>
           ${renderBottomNav()}
           <div id="detail-container"></div>
           <div id="overlay-container"></div>
@@ -1538,7 +2045,7 @@
       return `
         <div class="bottom-nav">
           <button class="nav-btn active"><div class="icon">🗺️</div><div class="label">Map</div></button>
-          <button class="nav-btn inactive"><div class="icon">🚶</div><div class="label">Routes</div></button>
+          <button class="nav-btn inactive" id="nav-routes"><div class="icon">🚶</div><div class="label">Routes</div></button>
           <button class="nav-btn-center" id="nav-add"><div class="icon">📸</div></button>
           <button class="nav-btn inactive"><div class="icon">🔔</div><div class="label">Alerts</div></button>
           <button class="nav-btn inactive" id="nav-profile"><div class="icon">👤</div><div class="label">Profile</div></button>
@@ -1883,18 +2390,18 @@
         });
       });
 
-      // FAB — opens camera directly
-      document.getElementById('fab-add')?.addEventListener('click', () => {
-        triggerQuickCamera();
-      });
-
-      // Nav add button — opens camera directly
+      // Nav camera button — opens camera directly
       document.getElementById('nav-add')?.addEventListener('click', () => {
         triggerQuickCamera();
       });
 
       // Quick camera input handler
       document.getElementById('quick-camera-input')?.addEventListener('change', handleQuickCamera);
+
+      // Routes
+      document.getElementById('nav-routes')?.addEventListener('click', () => {
+        toggleRouteMode();
+      });
 
       // Profile
       document.getElementById('profile-btn')?.addEventListener('click', () => {
