@@ -397,6 +397,41 @@
     }
     .form-submit:disabled { opacity: 0.5; }
 
+    /* Photo capture */
+    .photo-capture-area {
+      border: 2px dashed var(--border); border-radius: 16px;
+      padding: 20px; text-align: center; cursor: pointer;
+      transition: all 0.2s; background: white;
+    }
+    .photo-capture-area:hover { border-color: var(--green); }
+    .photo-capture-area .cam-icon { font-size: 32px; margin-bottom: 8px; }
+    .photo-capture-area .cam-label { font-size: 13px; color: var(--text-light); }
+    .photo-preview { position: relative; margin-top: 8px; }
+    .photo-preview img {
+      width: 100%; border-radius: 12px; max-height: 200px;
+      object-fit: cover;
+    }
+    .photo-preview .remove-photo {
+      position: absolute; top: 8px; right: 8px;
+      width: 28px; height: 28px; border-radius: 50%;
+      background: rgba(0,0,0,0.5); color: white; border: none;
+      font-size: 14px; cursor: pointer;
+    }
+
+    /* Profile photo */
+    .profile-avatar-wrap { position: relative; display: inline-block; }
+    .profile-avatar-edit {
+      position: absolute; bottom: 0; right: -4px;
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--orange); border: 2px solid white;
+      color: white; font-size: 12px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .profile-avatar-img {
+      width: 72px; height: 72px; border-radius: 50%;
+      object-fit: cover; border: 3px solid rgba(255,255,255,0.3);
+    }
+
     /* Profile screen */
     .profile-screen {
       position: fixed; inset: 0; z-index: 3000;
@@ -514,6 +549,8 @@
       toast: null,
       loading: false,
       userLocation: { lat: 34.0782, lng: -118.2606 }, // Default: Echo Park
+      spotPhoto: null, // base64 photo for new spot
+      profilePhoto: null, // base64 profile photo
     };
 
     let map = null;
@@ -563,6 +600,10 @@
     // Check if user is already signed in
     // ============================
     async function checkAuth() {
+      // Load saved profile photo
+      const savedPhoto = localStorage.getItem('lofo_profile_photo');
+      if (savedPhoto) state.profilePhoto = savedPhoto;
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         state.user = session.user;
@@ -655,6 +696,7 @@
 
       state.spots.unshift(data[0]);
       state.showAddForm = false;
+      state.spotPhoto = null;
       updateMapPins();
       render();
       showToast('New forage spot added! 🌱');
@@ -956,6 +998,12 @@
                 </div>
               </div>
 
+              ${spot.photo_url ? `
+                <div style="margin-bottom:16px">
+                  <img src="${spot.photo_url}" alt="${spot.plant_name}" style="width:100%;border-radius:14px;max-height:200px;object-fit:cover">
+                </div>
+              ` : ''}
+
               <div class="badge-row">
                 <span class="badge ${safety.cssClass}">${safety.icon} ${safety.label}</span>
                 <span class="badge" style="background:${status.bg};color:${status.color}">${status.label}</span>
@@ -1052,6 +1100,20 @@
           <div class="add-form-body">
             <form id="add-spot-form">
               <div class="form-group">
+                <label class="form-label">Photo</label>
+                <div class="photo-capture-area" id="photo-capture">
+                  <input type="file" accept="image/*" capture="environment" id="photo-input" style="display:none">
+                  <div id="photo-placeholder">
+                    <div class="cam-icon">📸</div>
+                    <div class="cam-label">Tap to take a photo or choose from gallery</div>
+                  </div>
+                  <div class="photo-preview" id="photo-preview" style="display:none">
+                    <img id="photo-preview-img" src="" alt="Plant photo">
+                    <button type="button" class="remove-photo" id="remove-photo">✕</button>
+                  </div>
+                </div>
+              </div>
+              <div class="form-group">
                 <label class="form-label">Plant name *</label>
                 <input type="text" class="form-input" name="plant_name" placeholder="e.g., Meyer Lemon Tree" required>
               </div>
@@ -1139,7 +1201,14 @@
         <div class="profile-screen">
           <div class="profile-header">
             <button class="profile-back" id="profile-close">←</button>
-            <div class="profile-avatar">${displayName[0].toUpperCase()}</div>
+            <div class="profile-avatar-wrap">
+              <input type="file" accept="image/*" id="profile-photo-input" style="display:none">
+              ${state.profilePhoto
+                ? `<img class="profile-avatar-img" src="${state.profilePhoto}" alt="Profile">`
+                : `<div class="profile-avatar">${displayName[0].toUpperCase()}</div>`
+              }
+              <button class="profile-avatar-edit" id="profile-photo-btn">📷</button>
+            </div>
             <div class="profile-name">${displayName}</div>
             <div class="profile-location">Echo Park, LA</div>
           </div>
@@ -1288,6 +1357,7 @@
     function setupAddFormListeners() {
       document.getElementById('add-form-close')?.addEventListener('click', () => {
         state.showAddForm = false;
+        state.spotPhoto = null;
         render();
       });
 
@@ -1307,6 +1377,45 @@
           opt.classList.add('selected');
           document.getElementById('add-property').value = opt.dataset.prop;
         });
+      });
+
+      // Photo capture
+      document.getElementById('photo-capture')?.addEventListener('click', (e) => {
+        if (e.target.id !== 'remove-photo') {
+          document.getElementById('photo-input')?.click();
+        }
+      });
+      document.getElementById('photo-input')?.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            // Resize image to save space
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              const maxSize = 800;
+              let w = img.width, h = img.height;
+              if (w > h) { if (w > maxSize) { h *= maxSize / w; w = maxSize; } }
+              else { if (h > maxSize) { w *= maxSize / h; h = maxSize; } }
+              canvas.width = w; canvas.height = h;
+              canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+              state.spotPhoto = canvas.toDataURL('image/jpeg', 0.7);
+              document.getElementById('photo-preview-img').src = state.spotPhoto;
+              document.getElementById('photo-preview').style.display = 'block';
+              document.getElementById('photo-placeholder').style.display = 'none';
+            };
+            img.src = ev.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+      document.getElementById('remove-photo')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.spotPhoto = null;
+        document.getElementById('photo-preview').style.display = 'none';
+        document.getElementById('photo-placeholder').style.display = 'block';
+        document.getElementById('photo-input').value = '';
       });
 
       // Use my location
@@ -1336,6 +1445,7 @@
           season: form.season.value || null,
           uses: form.uses.value || null,
           description: form.description.value || null,
+          photo_url: state.spotPhoto || null,
           lat: parseFloat(form.lat.value),
           lng: parseFloat(form.lng.value),
           ripe_now: form.ripe_now.checked,
@@ -1350,6 +1460,36 @@
         render();
       });
       document.getElementById('logout-btn')?.addEventListener('click', logout);
+
+      // Profile photo
+      document.getElementById('profile-photo-btn')?.addEventListener('click', () => {
+        document.getElementById('profile-photo-input')?.click();
+      });
+      document.getElementById('profile-photo-input')?.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = 200; canvas.height = 200;
+              const ctx = canvas.getContext('2d');
+              const size = Math.min(img.width, img.height);
+              const sx = (img.width - size) / 2;
+              const sy = (img.height - size) / 2;
+              ctx.drawImage(img, sx, sy, size, size, 0, 0, 200, 200);
+              state.profilePhoto = canvas.toDataURL('image/jpeg', 0.8);
+              localStorage.setItem('lofo_profile_photo', state.profilePhoto);
+              render();
+              setupProfileListeners();
+              showToast('Profile photo updated! 📸');
+            };
+            img.src = ev.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      });
     }
 
     // ============================
