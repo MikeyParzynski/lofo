@@ -802,8 +802,10 @@
       state.spots.unshift(data[0]);
       state.showAddForm = false;
       state.spotPhoto = null;
+      state.plantIdResult = null;
       updateMapPins();
-      render();
+      // Remove form without full re-render
+      document.getElementById('add-form-screen')?.remove();
       showToast('New forage spot added! 🌱');
     }
 
@@ -1037,24 +1039,33 @@
     // ============================
     async function identifyPlant(base64Image) {
       state.identifyingPlant = true;
-      renderPlantIdStatus();
+      state.plantIdResult = null;
 
       try {
         // Convert base64 to blob for PlantNet
-        const response = await fetch(base64Image);
-        const blob = await response.blob();
+        const blobResp = await fetch(base64Image);
+        const blob = await blobResp.blob();
 
         const formData = new FormData();
         formData.append('images', blob, 'plant.jpg');
         formData.append('organs', 'auto');
 
         // PlantNet free API — 500 requests/day
-        const PLANTNET_KEY = '2b10AAvcMSv4LwBHJoLdCrFe';
-        const apiUrl = `https://my-api.plantnet.org/v2/identify/all?include-related-images=false&no-reject=false&lang=en&api-key=${PLANTNET_KEY}`;
+        // Get your key at https://my.plantnet.org/
+        const PLANTNET_KEY = '2b10qVWfBJksdgVIQMQEWdIDu';
+        const apiUrl = `https://my-api.plantnet.org/v2/identify/all?include-related-images=false&no-reject=false&nb-results=3&lang=en&type=kt&api-key=${PLANTNET_KEY}`;
 
-        const result = await fetch(apiUrl, { method: 'POST', body: formData });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+
+        const result = await fetch(apiUrl, {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
         const data = await result.json();
-
         state.identifyingPlant = false;
 
         if (data.results && data.results.length > 0) {
@@ -1066,49 +1077,50 @@
             family: species.family?.scientificNameWithoutAuthor || '',
             score: Math.round(top.score * 100),
           };
-
-          // Auto-fill the form
-          const nameInput = document.querySelector('input[name="plant_name"]');
-          const sciInput = document.querySelector('input[name="scientific_name"]');
-          if (nameInput && state.plantIdResult.commonName) {
-            nameInput.value = state.plantIdResult.commonName;
-          }
-          if (sciInput && state.plantIdResult.scientificName) {
-            sciInput.value = state.plantIdResult.scientificName;
-          }
-
-          // Try to guess category from family
-          const family = (state.plantIdResult.family || '').toLowerCase();
-          const name = (state.plantIdResult.commonName || '').toLowerCase();
-          let guessedCategory = null;
-          if (['rosaceae','rutaceae','moraceae','vitaceae','sapindaceae','musaceae','cucurbitaceae'].includes(family) ||
-              name.includes('fruit') || name.includes('berry') || name.includes('lemon') || name.includes('orange') || name.includes('apple') || name.includes('fig')) {
-            guessedCategory = 'fruit';
-          } else if (['lamiaceae','apiaceae','amaryllidaceae'].includes(family) ||
-              name.includes('mint') || name.includes('basil') || name.includes('rosemary') || name.includes('herb') || name.includes('sage') || name.includes('thyme')) {
-            guessedCategory = 'herb';
-          } else if (name.includes('flower') || name.includes('rose') || name.includes('lily') || name.includes('daisy') || name.includes('lavender') || name.includes('hibiscus')) {
-            guessedCategory = 'flower';
-          }
-
-          if (guessedCategory) {
-            document.querySelectorAll('.category-option').forEach(o => o.classList.remove('selected'));
-            const catOpt = document.querySelector(`[data-cat="${guessedCategory}"]`);
-            if (catOpt) {
-              catOpt.classList.add('selected');
-              document.getElementById('add-category').value = guessedCategory;
-            }
-          }
-
-          showToast(`Identified: ${state.plantIdResult.commonName} (${state.plantIdResult.score}% match) 🔍`);
-        } else {
-          showToast('Could not identify plant. Try a clearer photo! 📸');
+          return; // Success — form will be filled by openAddFormWithData
         }
       } catch (err) {
-        state.identifyingPlant = false;
-        showToast('Plant ID unavailable. You can still add manually! 🌿');
+        // Silently fail — user can still fill manually
       }
-      renderPlantIdStatus();
+      state.identifyingPlant = false;
+    }
+
+    function applyPlantIdToForm() {
+      if (!state.plantIdResult) return;
+
+      const nameInput = document.querySelector('input[name="plant_name"]');
+      const sciInput = document.querySelector('input[name="scientific_name"]');
+      if (nameInput && state.plantIdResult.commonName) {
+        nameInput.value = state.plantIdResult.commonName;
+      }
+      if (sciInput && state.plantIdResult.scientificName) {
+        sciInput.value = state.plantIdResult.scientificName;
+      }
+
+      // Guess category
+      const family = (state.plantIdResult.family || '').toLowerCase();
+      const name = (state.plantIdResult.commonName || '').toLowerCase();
+      let guessedCategory = null;
+      if (['rosaceae','rutaceae','moraceae','vitaceae','sapindaceae','musaceae','cucurbitaceae'].includes(family) ||
+          name.includes('fruit') || name.includes('berry') || name.includes('lemon') || name.includes('orange') || name.includes('apple') || name.includes('fig')) {
+        guessedCategory = 'fruit';
+      } else if (['lamiaceae','apiaceae','amaryllidaceae'].includes(family) ||
+          name.includes('mint') || name.includes('basil') || name.includes('rosemary') || name.includes('herb') || name.includes('sage') || name.includes('thyme')) {
+        guessedCategory = 'herb';
+      } else if (name.includes('flower') || name.includes('rose') || name.includes('lily') || name.includes('daisy') || name.includes('lavender') || name.includes('hibiscus')) {
+        guessedCategory = 'flower';
+      }
+
+      if (guessedCategory) {
+        document.querySelectorAll('.category-option').forEach(o => o.classList.remove('selected'));
+        const catOpt = document.querySelector(`[data-cat="${guessedCategory}"]`);
+        if (catOpt) {
+          catOpt.classList.add('selected');
+          document.getElementById('add-category').value = guessedCategory;
+        }
+      }
+
+      showToast(`Identified: ${state.plantIdResult.commonName} (${state.plantIdResult.score}% match) 🔍`);
     }
 
     function renderPlantIdStatus() {
@@ -1124,6 +1136,115 @@
       } else {
         el.innerHTML = '';
       }
+    }
+
+    // ============================
+    // Quick Camera Flow
+    // ============================
+    function triggerQuickCamera() {
+      const input = document.getElementById('quick-camera-input');
+      if (input) {
+        input.value = '';
+        input.click();
+      }
+    }
+
+    function handleQuickCamera(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      showToast('Identifying plant... 🔍');
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          // Resize
+          const canvas = document.createElement('canvas');
+          const maxSize = 800;
+          let w = img.width, h = img.height;
+          if (w > h) { if (w > maxSize) { h *= maxSize / w; w = maxSize; } }
+          else { if (h > maxSize) { w *= maxSize / h; h = maxSize; } }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          state.spotPhoto = canvas.toDataURL('image/jpeg', 0.7);
+
+          // Auto-get location
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                state._pendingLat = pos.coords.latitude.toFixed(6);
+                state._pendingLng = pos.coords.longitude.toFixed(6);
+              },
+              () => {}
+            );
+          }
+
+          // Try to identify plant, then open form
+          identifyPlant(state.spotPhoto).then(() => {
+            openAddFormWithData();
+          }).catch(() => {
+            openAddFormWithData();
+          });
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function openAddFormWithData() {
+      state.showAddForm = true;
+      render();
+
+      // Pre-fill everything after DOM is ready
+      setTimeout(() => {
+        // Photo preview
+        if (state.spotPhoto) {
+          const previewImg = document.getElementById('photo-preview-img');
+          const preview = document.getElementById('photo-preview');
+          const placeholder = document.getElementById('photo-placeholder');
+          if (previewImg) previewImg.src = state.spotPhoto;
+          if (preview) preview.style.display = 'block';
+          if (placeholder) placeholder.style.display = 'none';
+        }
+
+        // Location
+        if (state._pendingLat) {
+          const latInput = document.getElementById('add-lat');
+          const lngInput = document.getElementById('add-lng');
+          if (latInput) latInput.value = state._pendingLat;
+          if (lngInput) lngInput.value = state._pendingLng;
+        }
+
+        // Apply plant ID results
+        applyPlantIdToForm();
+        renderPlantIdStatus();
+      }, 150);
+    }
+
+    // ============================
+    // Favorites
+    // ============================
+    function loadFavorites() {
+      const saved = localStorage.getItem('lofo_favorites');
+      return saved ? JSON.parse(saved) : [];
+    }
+
+    function toggleFavorite(spotId) {
+      let favs = loadFavorites();
+      if (favs.includes(spotId)) {
+        favs = favs.filter(id => id !== spotId);
+        showToast('Removed from favorites');
+      } else {
+        favs.push(spotId);
+        showToast('Saved to favorites! ⭐');
+      }
+      localStorage.setItem('lofo_favorites', JSON.stringify(favs));
+      renderDetailSheet();
+    }
+
+    function isFavorite(spotId) {
+      return loadFavorites().includes(spotId);
     }
 
     // ============================
@@ -1244,7 +1365,12 @@
             state.selectedSpot = spot;
             loadComments(spot.id);
             loadHarvests(spot.id);
-            render();
+            // Render detail into container without full re-render
+            const container = document.getElementById('detail-container');
+            if (container) {
+              container.innerHTML = renderDetailOverlay();
+              setupDetailListeners();
+            }
           });
         markers.push(marker);
       });
@@ -1257,35 +1383,61 @@
     // ============================
     // Rendering
     // ============================
+    let mapScreenInitialized = false;
+
     function render() {
       const app = document.getElementById('app');
 
       if (state.screen === 'splash') {
+        mapScreenInitialized = false;
         app.innerHTML = renderSplash();
         return;
       }
 
       if (state.screen === 'auth') {
+        mapScreenInitialized = false;
         app.innerHTML = renderAuth();
         setupAuthListeners();
         return;
       }
 
-      // Map screen
-      app.innerHTML = `
-        <div id="map"></div>
-        ${renderSearchBar()}
-        <div class="spot-count" id="spot-count">${getFilteredSpots().length} spots nearby</div>
-        ${renderFilterBar()}
-        <button class="fab" id="fab-add" title="Add spot">+</button>
-        ${renderBottomNav()}
-        ${renderDetailOverlay()}
-        ${state.showAddForm ? renderAddForm() : ''}
-        ${state.showProfile ? renderProfile() : ''}
-        ${state.toast ? renderToast() : ''}
-      `;
+      // Map screen — only build the base once, then manage overlays
+      if (!mapScreenInitialized) {
+        app.innerHTML = `
+          <div id="map"></div>
+          ${renderSearchBar()}
+          <div class="spot-count" id="spot-count">${getFilteredSpots().length} spots nearby</div>
+          ${renderFilterBar()}
+          <button class="fab" id="fab-add" title="Add spot">+</button>
+          ${renderBottomNav()}
+          <div id="detail-container"></div>
+          <div id="overlay-container"></div>
+          <input type="file" accept="image/*" capture="environment" id="quick-camera-input" style="display:none">
+        `;
+        mapScreenInitialized = true;
+        setupMapListeners();
+      } else {
+        // Update dynamic parts without destroying map
+        const countEl = document.getElementById('spot-count');
+        if (countEl) countEl.textContent = `${getFilteredSpots().length} spots nearby`;
+      }
 
-      setupMapListeners();
+      // Manage overlays independently
+      const detailContainer = document.getElementById('detail-container');
+      if (detailContainer) {
+        detailContainer.innerHTML = state.selectedSpot ? renderDetailOverlay() : '';
+        if (state.selectedSpot) setupDetailListeners();
+      }
+
+      const overlayContainer = document.getElementById('overlay-container');
+      if (overlayContainer) {
+        let overlayHTML = '';
+        if (state.showAddForm) overlayHTML += renderAddForm();
+        if (state.showProfile) overlayHTML += renderProfile();
+        overlayContainer.innerHTML = overlayHTML;
+        if (state.showAddForm) setupAddFormListeners();
+        if (state.showProfile) setupProfileListeners();
+      }
     }
 
     function getFilteredSpots() {
@@ -1492,7 +1644,12 @@
                 </div>
               </div>
 
-              <button class="harvest-btn" id="harvest-btn">🧺 I Picked Here</button>
+              <div style="display:flex;gap:8px;margin-bottom:12px">
+                <button class="harvest-btn" id="harvest-btn" style="flex:1;margin-bottom:0">🧺 I Picked Here</button>
+                <button class="harvest-btn" id="fav-btn" style="flex:0;padding:14px 18px;margin-bottom:0;background:${isFavorite(spot.id) ? 'linear-gradient(135deg, #FFD700, #FFA500)' : 'linear-gradient(135deg, #E8E0D4, #D4C9B8)'}">
+                  ${isFavorite(spot.id) ? '⭐' : '☆'}
+                </button>
+              </div>
               ${state.harvests.length > 0 ? `
                 <div class="harvest-log">
                   <div style="font-size:12px;font-weight:700;margin-bottom:6px">Recent harvests (${state.harvests.length})</div>
@@ -1518,9 +1675,10 @@
     }
 
     function renderDetailSheet() {
-      const overlay = document.getElementById('detail-overlay');
-      if (overlay && state.selectedSpot) {
-        overlay.outerHTML = renderDetailOverlay();
+      if (!state.selectedSpot) return;
+      const container = document.getElementById('detail-container');
+      if (container) {
+        container.innerHTML = renderDetailOverlay();
         setupDetailListeners();
       }
     }
@@ -1705,28 +1863,38 @@
         btn.addEventListener('click', () => {
           const key = btn.dataset.filter;
           state.filters[key] = !state.filters[key];
-          updateMapPins();
-          render();
-          // Re-init map reference since render replaces DOM
-          if (!document.getElementById('map')._leaflet_id) {
-            initMap();
+          // Update filter button styles without re-rendering
+          btn.classList.toggle('active');
+          btn.classList.toggle('inactive');
+          const f = [
+            { key: 'fruit', color: 'var(--orange)', bg: 'var(--orange-light)' },
+            { key: 'herb', color: 'var(--green)', bg: 'var(--green-light)' },
+            { key: 'flower', color: 'var(--pink)', bg: 'var(--pink-light)' },
+            { key: 'other', color: 'var(--brown)', bg: 'var(--brown-light)' },
+          ].find(x => x.key === key);
+          if (state.filters[key] && f) {
+            btn.style.background = f.bg;
+            btn.style.color = f.color;
+          } else {
+            btn.style.background = '';
+            btn.style.color = '';
           }
+          updateMapPins();
         });
       });
 
-      // FAB
+      // FAB — opens camera directly
       document.getElementById('fab-add')?.addEventListener('click', () => {
-        state.showAddForm = true;
-        render();
-        setupAddFormListeners();
+        triggerQuickCamera();
       });
 
-      // Nav add button
+      // Nav add button — opens camera directly
       document.getElementById('nav-add')?.addEventListener('click', () => {
-        state.showAddForm = true;
-        render();
-        setupAddFormListeners();
+        triggerQuickCamera();
       });
+
+      // Quick camera input handler
+      document.getElementById('quick-camera-input')?.addEventListener('change', handleQuickCamera);
 
       // Profile
       document.getElementById('profile-btn')?.addEventListener('click', () => {
@@ -1748,13 +1916,17 @@
       document.getElementById('detail-close')?.addEventListener('click', () => {
         state.selectedSpot = null;
         state.comments = [];
-        render();
+        state.harvests = [];
+        const container = document.getElementById('detail-container');
+        if (container) container.innerHTML = '';
       });
       document.getElementById('detail-overlay')?.addEventListener('click', (e) => {
         if (e.target.id === 'detail-overlay') {
           state.selectedSpot = null;
           state.comments = [];
-          render();
+          state.harvests = [];
+          const container = document.getElementById('detail-container');
+          if (container) container.innerHTML = '';
         }
       });
 
@@ -1794,6 +1966,11 @@
         if (state.selectedSpot) logHarvest(state.selectedSpot.id);
       });
 
+      // Favorite
+      document.getElementById('fav-btn')?.addEventListener('click', () => {
+        if (state.selectedSpot) toggleFavorite(state.selectedSpot.id);
+      });
+
       // Share
       document.getElementById('action-share')?.addEventListener('click', () => {
         if (state.selectedSpot) shareSpot(state.selectedSpot);
@@ -1805,7 +1982,8 @@
         state.showAddForm = false;
         state.spotPhoto = null;
         state.plantIdResult = null;
-        render();
+        // Remove form without full re-render to preserve map
+        document.getElementById('add-form-screen')?.remove();
       });
 
       // Category picker
@@ -1910,7 +2088,9 @@
     function setupProfileListeners() {
       document.getElementById('profile-close')?.addEventListener('click', () => {
         state.showProfile = false;
-        render();
+        // Remove profile without full re-render to preserve map
+        const profileEl = document.querySelector('.profile-screen');
+        if (profileEl) profileEl.remove();
       });
       document.getElementById('logout-btn')?.addEventListener('click', logout);
 
