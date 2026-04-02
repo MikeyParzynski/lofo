@@ -517,6 +517,105 @@
     .status-btn.active-plenty { border-color: var(--safe); background: var(--safe-bg); color: var(--safe); }
     .status-btn.active-some { border-color: var(--caution); background: var(--caution-bg); color: var(--caution); }
     .status-btn.active-picked { border-color: var(--danger); background: var(--danger-bg); color: var(--danger); }
+
+    /* Seasonal glow on pins */
+    @keyframes seasonGlow {
+      0%, 100% { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)) drop-shadow(0 0 6px rgba(74,155,95,0.4)); }
+      50% { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)) drop-shadow(0 0 14px rgba(74,155,95,0.8)); }
+    }
+    .pin-inner.in-season { animation: seasonGlow 2s ease-in-out infinite; }
+    .pin-season-badge {
+      position: absolute; bottom: -6px; left: 50%;
+      transform: translateX(-50%); font-size: 9px;
+      background: var(--safe); color: white;
+      padding: 1px 6px; border-radius: 6px;
+      white-space: nowrap; font-weight: 700;
+    }
+
+    /* Harvest log button */
+    .harvest-btn {
+      width: 100%; padding: 14px; border-radius: 14px; border: none;
+      background: linear-gradient(135deg, var(--orange), #D47730);
+      color: white; font-size: 14px; font-weight: 700;
+      cursor: pointer; margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 2px 12px rgba(232,134,58,0.3);
+      transition: transform 0.15s;
+    }
+    .harvest-btn:active { transform: scale(0.97); }
+    .harvest-log { margin-top: 8px; }
+    .harvest-log-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; background: var(--cream); border-radius: 10px;
+      margin-bottom: 4px; font-size: 12px;
+    }
+    .harvest-log-item .harvest-user { font-weight: 600; }
+    .harvest-log-item .harvest-time { color: var(--text-muted); margin-left: auto; }
+
+    /* Share card */
+    .share-btn {
+      padding: 14px 18px; border-radius: 14px;
+      border: 2px solid var(--border); background: white;
+      font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .share-modal {
+      position: fixed; inset: 0; z-index: 6000;
+      background: rgba(0,0,0,0.5);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .share-modal.hidden { display: none; }
+    .share-card {
+      background: white; border-radius: 24px; padding: 24px;
+      max-width: 340px; width: 100%; text-align: center;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+    }
+    .share-card-preview {
+      background: linear-gradient(135deg, var(--green-dark), var(--green));
+      border-radius: 16px; padding: 24px; color: white; margin-bottom: 16px;
+    }
+    .share-card-preview .share-emoji { font-size: 40px; margin-bottom: 8px; }
+    .share-card-preview h3 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .share-card-preview p { font-size: 13px; opacity: 0.85; }
+    .share-card-preview .share-badge {
+      display: inline-block; background: rgba(255,255,255,0.2);
+      padding: 4px 12px; border-radius: 8px; font-size: 12px;
+      margin-top: 8px;
+    }
+    .share-actions { display: flex; gap: 8px; }
+    .share-actions button {
+      flex: 1; padding: 12px; border-radius: 12px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .share-copy-btn { background: var(--green); color: white; }
+    .share-text-btn { background: var(--orange-light); color: var(--orange); }
+    .share-close-btn { background: var(--cream); color: var(--text-light); }
+
+    /* Nearby alert banner */
+    .nearby-alert {
+      position: fixed; bottom: 90px; left: 12px; right: 12px;
+      z-index: 1500; background: white; border-radius: 16px;
+      padding: 14px 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+      display: flex; align-items: center; gap: 12px;
+      animation: slideUp 0.3s ease-out;
+      border-left: 4px solid var(--green);
+    }
+    .nearby-alert.hidden { display: none; }
+    .nearby-alert-icon { font-size: 28px; }
+    .nearby-alert-info { flex: 1; }
+    .nearby-alert-title { font-size: 14px; font-weight: 700; }
+    .nearby-alert-dist { font-size: 12px; color: var(--text-light); }
+    .nearby-alert-close {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: none; background: var(--cream); font-size: 14px;
+      cursor: pointer;
+    }
+    .nearby-alert-go {
+      padding: 8px 14px; border-radius: 10px; border: none;
+      background: var(--green); color: white; font-size: 12px;
+      font-weight: 600; cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -551,6 +650,12 @@
       userLocation: { lat: 34.0782, lng: -118.2606 }, // Default: Echo Park
       spotPhoto: null, // base64 photo for new spot
       profilePhoto: null, // base64 profile photo
+      harvests: [], // harvest log entries for selected spot
+      nearbyAlert: null, // { spot, distance } for nearby notification
+      shareSpot: null, // spot being shared
+      dismissedAlerts: new Set(), // spot IDs user dismissed
+      plantIdResult: null, // result from plant ID API
+      identifyingPlant: false, // loading state for plant ID
     };
 
     let map = null;
@@ -744,6 +849,284 @@
     }
 
     // ============================
+    // Harvest Log
+    // ============================
+    async function logHarvest(spotId) {
+      const userName = state.user.user_metadata?.display_name || state.user.email.split('@')[0];
+      const { data, error } = await supabase
+        .from('harvests')
+        .insert([{ spot_id: spotId, user_id: state.user.id, user_name: userName }])
+        .select();
+
+      if (error) {
+        showToast('Error logging harvest: ' + error.message);
+        return;
+      }
+
+      if (data) state.harvests.unshift(data[0]);
+      renderDetailSheet();
+      showToast('Harvest logged! 🧺');
+
+      // Auto-update status if many recent harvests
+      if (state.harvests.length >= 5) {
+        updateSpotStatus(spotId, 'picked');
+      } else if (state.harvests.length >= 2) {
+        updateSpotStatus(spotId, 'some');
+      }
+    }
+
+    async function loadHarvests(spotId) {
+      const { data } = await supabase
+        .from('harvests')
+        .select('*')
+        .eq('spot_id', spotId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      state.harvests = data || [];
+    }
+
+    // ============================
+    // Share a Spot
+    // ============================
+    async function shareSpot(spot) {
+      const cat = CATEGORIES[spot.category] || CATEGORIES.other;
+      const shareText = `🌿 Found on LoFo: ${cat.icon} ${spot.plant_name}${spot.season ? ` (Season: ${spot.season})` : ''}. Check it out!`;
+      const shareUrl = `https://mikeyparzynski.github.io/lofo/`;
+
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: `LoFo: ${spot.plant_name}`, text: shareText, url: shareUrl });
+          showToast('Shared! 🎉');
+          return;
+        } catch (e) { /* User cancelled or not supported, fall through to modal */ }
+      }
+      // Show share modal as fallback
+      state.shareSpot = spot;
+      renderShareModal();
+    }
+
+    function renderShareModal() {
+      const existing = document.getElementById('share-modal');
+      if (existing) existing.remove();
+
+      if (!state.shareSpot) return;
+      const spot = state.shareSpot;
+      const cat = CATEGORIES[spot.category] || CATEGORIES.other;
+      const safety = SAFETY_CONFIG[spot.safety_level] || SAFETY_CONFIG.safe;
+
+      const modal = document.createElement('div');
+      modal.className = 'share-modal';
+      modal.id = 'share-modal';
+      modal.innerHTML = `
+        <div class="share-card">
+          <div class="share-card-preview">
+            <div class="share-emoji">${cat.icon}</div>
+            <h3>${spot.plant_name}</h3>
+            <p>${spot.scientific_name || cat.label}</p>
+            <div class="share-badge">${safety.icon} ${safety.label}${spot.season ? ` · 📅 ${spot.season}` : ''}</div>
+          </div>
+          <p style="font-size:13px;color:var(--text-light);margin-bottom:12px">Share this spot with friends!</p>
+          <div class="share-actions">
+            <button class="share-copy-btn" id="share-copy">📋 Copy Link</button>
+            <button class="share-text-btn" id="share-text">💬 Copy Text</button>
+          </div>
+          <button class="share-close-btn" id="share-close" style="width:100%;margin-top:8px;padding:10px;border-radius:10px;border:none;background:var(--cream);cursor:pointer">Close</button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      document.getElementById('share-copy').addEventListener('click', () => {
+        navigator.clipboard.writeText('https://mikeyparzynski.github.io/lofo/');
+        showToast('Link copied! 📋');
+      });
+      document.getElementById('share-text').addEventListener('click', () => {
+        const text = `🌿 Found on LoFo: ${cat.icon} ${spot.plant_name}${spot.season ? ` (${spot.season})` : ''}. Download LoFo to see it on the map! https://mikeyparzynski.github.io/lofo/`;
+        navigator.clipboard.writeText(text);
+        showToast('Share text copied! 💬');
+      });
+      document.getElementById('share-close').addEventListener('click', () => {
+        state.shareSpot = null;
+        modal.remove();
+      });
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) { state.shareSpot = null; modal.remove(); }
+      });
+    }
+
+    // ============================
+    // Nearby Alerts
+    // ============================
+    function startNearbyAlerts() {
+      if (!navigator.geolocation) return;
+
+      navigator.geolocation.watchPosition((pos) => {
+        state.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+
+        // Update user dot on map
+        if (map) {
+          map.eachLayer(layer => {
+            if (layer instanceof L.CircleMarker && layer.options.className === 'user-dot') {
+              layer.setLatLng([state.userLocation.lat, state.userLocation.lng]);
+            }
+          });
+        }
+
+        // Check nearby in-season spots
+        const nearbyThreshold = 200; // meters
+        for (const spot of state.spots) {
+          if (state.dismissedAlerts.has(spot.id)) continue;
+          if (!isInSeason(spot.season) && !spot.ripe_now) continue;
+
+          const dist = getDistance(state.userLocation.lat, state.userLocation.lng, spot.lat, spot.lng);
+          if (dist < nearbyThreshold) {
+            state.nearbyAlert = { spot, distance: Math.round(dist) };
+            renderNearbyAlert();
+            return;
+          }
+        }
+      }, () => {}, { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 });
+    }
+
+    function renderNearbyAlert() {
+      const existing = document.getElementById('nearby-alert');
+      if (existing) existing.remove();
+
+      if (!state.nearbyAlert) return;
+      const { spot, distance } = state.nearbyAlert;
+      const cat = CATEGORIES[spot.category] || CATEGORIES.other;
+
+      const el = document.createElement('div');
+      el.className = 'nearby-alert';
+      el.id = 'nearby-alert';
+      el.innerHTML = `
+        <div class="nearby-alert-icon">${cat.icon}</div>
+        <div class="nearby-alert-info">
+          <div class="nearby-alert-title">${spot.plant_name} nearby!</div>
+          <div class="nearby-alert-dist">${distance}m away · ${isInSeason(spot.season) ? '✨ In season now' : '🟢 Ripe'}</div>
+        </div>
+        <button class="nearby-alert-go" id="nearby-go">Go</button>
+        <button class="nearby-alert-close" id="nearby-dismiss">✕</button>
+      `;
+      document.body.appendChild(el);
+
+      document.getElementById('nearby-go')?.addEventListener('click', () => {
+        state.selectedSpot = spot;
+        loadComments(spot.id);
+        loadHarvests(spot.id);
+        render();
+        el.remove();
+        state.nearbyAlert = null;
+      });
+      document.getElementById('nearby-dismiss')?.addEventListener('click', () => {
+        state.dismissedAlerts.add(spot.id);
+        state.nearbyAlert = null;
+        el.remove();
+      });
+
+      // Auto-dismiss after 10 seconds
+      setTimeout(() => {
+        if (document.getElementById('nearby-alert')) {
+          el.remove();
+          state.nearbyAlert = null;
+        }
+      }, 10000);
+    }
+
+    // ============================
+    // Plant ID (PlantNet API)
+    // ============================
+    async function identifyPlant(base64Image) {
+      state.identifyingPlant = true;
+      renderPlantIdStatus();
+
+      try {
+        // Convert base64 to blob for PlantNet
+        const response = await fetch(base64Image);
+        const blob = await response.blob();
+
+        const formData = new FormData();
+        formData.append('images', blob, 'plant.jpg');
+        formData.append('organs', 'auto');
+
+        // PlantNet free API — 500 requests/day
+        const PLANTNET_KEY = '2b10AAvcMSv4LwBHJoLdCrFe';
+        const apiUrl = `https://my-api.plantnet.org/v2/identify/all?include-related-images=false&no-reject=false&lang=en&api-key=${PLANTNET_KEY}`;
+
+        const result = await fetch(apiUrl, { method: 'POST', body: formData });
+        const data = await result.json();
+
+        state.identifyingPlant = false;
+
+        if (data.results && data.results.length > 0) {
+          const top = data.results[0];
+          const species = top.species;
+          state.plantIdResult = {
+            commonName: species.commonNames?.[0] || species.scientificNameWithoutAuthor,
+            scientificName: species.scientificNameWithoutAuthor,
+            family: species.family?.scientificNameWithoutAuthor || '',
+            score: Math.round(top.score * 100),
+          };
+
+          // Auto-fill the form
+          const nameInput = document.querySelector('input[name="plant_name"]');
+          const sciInput = document.querySelector('input[name="scientific_name"]');
+          if (nameInput && state.plantIdResult.commonName) {
+            nameInput.value = state.plantIdResult.commonName;
+          }
+          if (sciInput && state.plantIdResult.scientificName) {
+            sciInput.value = state.plantIdResult.scientificName;
+          }
+
+          // Try to guess category from family
+          const family = (state.plantIdResult.family || '').toLowerCase();
+          const name = (state.plantIdResult.commonName || '').toLowerCase();
+          let guessedCategory = null;
+          if (['rosaceae','rutaceae','moraceae','vitaceae','sapindaceae','musaceae','cucurbitaceae'].includes(family) ||
+              name.includes('fruit') || name.includes('berry') || name.includes('lemon') || name.includes('orange') || name.includes('apple') || name.includes('fig')) {
+            guessedCategory = 'fruit';
+          } else if (['lamiaceae','apiaceae','amaryllidaceae'].includes(family) ||
+              name.includes('mint') || name.includes('basil') || name.includes('rosemary') || name.includes('herb') || name.includes('sage') || name.includes('thyme')) {
+            guessedCategory = 'herb';
+          } else if (name.includes('flower') || name.includes('rose') || name.includes('lily') || name.includes('daisy') || name.includes('lavender') || name.includes('hibiscus')) {
+            guessedCategory = 'flower';
+          }
+
+          if (guessedCategory) {
+            document.querySelectorAll('.category-option').forEach(o => o.classList.remove('selected'));
+            const catOpt = document.querySelector(`[data-cat="${guessedCategory}"]`);
+            if (catOpt) {
+              catOpt.classList.add('selected');
+              document.getElementById('add-category').value = guessedCategory;
+            }
+          }
+
+          showToast(`Identified: ${state.plantIdResult.commonName} (${state.plantIdResult.score}% match) 🔍`);
+        } else {
+          showToast('Could not identify plant. Try a clearer photo! 📸');
+        }
+      } catch (err) {
+        state.identifyingPlant = false;
+        showToast('Plant ID unavailable. You can still add manually! 🌿');
+      }
+      renderPlantIdStatus();
+    }
+
+    function renderPlantIdStatus() {
+      const el = document.getElementById('plant-id-status');
+      if (!el) return;
+      if (state.identifyingPlant) {
+        el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--green-light);border-radius:12px;margin-bottom:12px"><span class="spinner" style="border-color:rgba(74,124,89,0.3);border-top-color:var(--green);width:16px;height:16px"></span><span style="font-size:13px;color:var(--green);font-weight:600">Identifying plant...</span></div>';
+      } else if (state.plantIdResult) {
+        el.innerHTML = `<div style="padding:10px 14px;background:var(--green-light);border-radius:12px;margin-bottom:12px;font-size:13px">
+          <strong style="color:var(--green)">🔍 Identified:</strong> ${state.plantIdResult.commonName}
+          <span style="color:var(--text-light)">(${state.plantIdResult.score}% match)</span>
+        </div>`;
+      } else {
+        el.innerHTML = '';
+      }
+    }
+
+    // ============================
     // Map
     // ============================
     function initMap() {
@@ -789,20 +1172,56 @@
       }, 100);
     }
 
-    function createPinIcon(category, ripeNow) {
+    // Check if a spot is currently in season based on its season text
+    function isInSeason(seasonText) {
+      if (!seasonText) return false;
+      const s = seasonText.toLowerCase().trim();
+      if (s === 'year-round' || s === 'year round' || s === 'all year') return true;
+      const monthMap = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
+        january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11 };
+      const now = new Date().getMonth();
+      // Try to parse "Mar–Sep" or "March-September" style
+      const rangeMatch = s.match(/([a-z]+)\s*[–\-—to]+\s*([a-z]+)/i);
+      if (rangeMatch) {
+        const start = monthMap[rangeMatch[1].toLowerCase().slice(0,3)];
+        const end = monthMap[rangeMatch[2].toLowerCase().slice(0,3)];
+        if (start !== undefined && end !== undefined) {
+          if (start <= end) return now >= start && now <= end;
+          else return now >= start || now <= end; // wraps around year
+        }
+      }
+      // Check if any month name appears in the text
+      for (const [key, val] of Object.entries(monthMap)) {
+        if (s.includes(key) && val === now) return true;
+      }
+      return false;
+    }
+
+    // Calculate distance between two lat/lng points in meters
+    function getDistance(lat1, lng1, lat2, lng2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function createPinIcon(category, ripeNow, season) {
       const cat = CATEGORIES[category] || CATEGORIES.other;
+      const inSeason = isInSeason(season);
       return L.divIcon({
         className: 'lofo-pin',
         iconSize: [36, 44],
         iconAnchor: [18, 44],
         popupAnchor: [0, -44],
         html: `
-          <div class="pin-inner">
+          <div class="pin-inner ${inSeason ? 'in-season' : ''}">
             <svg width="36" height="44" viewBox="0 0 32 40">
               <path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 24 16 24s16-12 16-24C32 7.16 24.84 0 16 0z" fill="${cat.pinColor}" />
             </svg>
             <span class="pin-emoji">${cat.icon}</span>
             ${ripeNow ? '<span class="pin-ripe">RIPE</span>' : ''}
+            ${inSeason && !ripeNow ? '<span class="pin-season-badge">IN SEASON</span>' : ''}
           </div>
         `,
       });
@@ -818,12 +1237,13 @@
       const filtered = state.spots.filter(s => state.filters[s.category]);
 
       filtered.forEach(spot => {
-        const icon = createPinIcon(spot.category, spot.ripe_now);
+        const icon = createPinIcon(spot.category, spot.ripe_now, spot.season);
         const marker = L.marker([spot.lat, spot.lng], { icon })
           .addTo(map)
           .on('click', () => {
             state.selectedSpot = spot;
             loadComments(spot.id);
+            loadHarvests(spot.id);
             render();
           });
         markers.push(marker);
@@ -1072,8 +1492,23 @@
                 </div>
               </div>
 
+              <button class="harvest-btn" id="harvest-btn">🧺 I Picked Here</button>
+              ${state.harvests.length > 0 ? `
+                <div class="harvest-log">
+                  <div style="font-size:12px;font-weight:700;margin-bottom:6px">Recent harvests (${state.harvests.length})</div>
+                  ${state.harvests.slice(0, 5).map(h => `
+                    <div class="harvest-log-item">
+                      <span>🧺</span>
+                      <span class="harvest-user">${h.user_name}</span>
+                      <span class="harvest-time">${timeAgo(h.created_at)}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+
               <div class="detail-actions">
                 <button class="action-primary" id="action-directions">🚶 Walk There</button>
+                <button class="share-btn" id="action-share">📤 Share</button>
                 <button class="action-secondary" id="action-report">🚩</button>
               </div>
             </div>
@@ -1113,6 +1548,7 @@
                   </div>
                 </div>
               </div>
+              <div id="plant-id-status"></div>
               <div class="form-group">
                 <label class="form-label">Plant name *</label>
                 <input type="text" class="form-input" name="plant_name" placeholder="e.g., Meyer Lemon Tree" required>
@@ -1352,12 +1788,23 @@
           window.open(url, '_blank');
         }
       });
+
+      // Harvest log
+      document.getElementById('harvest-btn')?.addEventListener('click', () => {
+        if (state.selectedSpot) logHarvest(state.selectedSpot.id);
+      });
+
+      // Share
+      document.getElementById('action-share')?.addEventListener('click', () => {
+        if (state.selectedSpot) shareSpot(state.selectedSpot);
+      });
     }
 
     function setupAddFormListeners() {
       document.getElementById('add-form-close')?.addEventListener('click', () => {
         state.showAddForm = false;
         state.spotPhoto = null;
+        state.plantIdResult = null;
         render();
       });
 
@@ -1404,6 +1851,10 @@
               document.getElementById('photo-preview-img').src = state.spotPhoto;
               document.getElementById('photo-preview').style.display = 'block';
               document.getElementById('photo-placeholder').style.display = 'none';
+
+              // Auto-identify the plant
+              state.plantIdResult = null;
+              identifyPlant(state.spotPhoto);
             };
             img.src = ev.target.result;
           };
@@ -1413,9 +1864,11 @@
       document.getElementById('remove-photo')?.addEventListener('click', (e) => {
         e.stopPropagation();
         state.spotPhoto = null;
+        state.plantIdResult = null;
         document.getElementById('photo-preview').style.display = 'none';
         document.getElementById('photo-placeholder').style.display = 'block';
         document.getElementById('photo-input').value = '';
+        renderPlantIdStatus();
       });
 
       // Use my location
@@ -1566,6 +2019,7 @@
     render();
     checkAuth().then(() => {
       setupRealtimeSubscriptions();
+      startNearbyAlerts();
     });
   </script>
 </body>
