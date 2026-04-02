@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#2D5A3D">
+  <title>LoFo — Local Forage</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --green: #4A7C59;
+      --green-dark: #2D5A3D;
+      --green-light: #E8F0E4;
+      --orange: #E8863A;
+      --orange-light: #FFF0E5;
+      --pink: #D4728C;
+      --pink-light: #FDE8EF;
+      --brown: #8B6F47;
+      --brown-light: #F5EDE0;
+      --cream: #FFF8F0;
+      --text: #2C2C2C;
+      --text-light: #7A7A7A;
+      --text-muted: #B0A899;
+      --border: #E8E0D4;
+      --safe: #4A9B5F;
+      --caution: #E0A030;
+      --danger: #D94444;
+      --safe-bg: #E8F5E9;
+      --caution-bg: #FFF8E1;
+      --danger-bg: #FFEBEE;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--cream);
+      color: var(--text);
+      overflow: hidden;
+      height: 100dvh;
+      width: 100vw;
+      position: fixed;
+      touch-action: manipulation;
+    }
+    #app { height: 100%; width: 100%; position: relative; }
+
+    /* Map */
+    #map { height: 100%; width: 100%; z-index: 1; }
+    .leaflet-control-zoom { display: none !important; }
+
+    /* Custom map pin */
+    .lofo-pin {
+      background: none !important;
+      border: none !important;
+    }
+    .pin-inner {
+      width: 36px; height: 44px; position: relative;
+      display: flex; align-items: flex-start; justify-content: center;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+      transition: transform 0.2s;
+      cursor: pointer;
+    }
+    .pin-inner:hover { transform: scale(1.15); }
+    .pin-inner svg { width: 36px; height: 44px; }
+    .pin-emoji {
+      position: absolute; top: 7px; left: 50%;
+      transform: translateX(-50%); font-size: 15px;
+    }
+    .pin-ripe {
+      position: absolute; top: -8px; right: -14px;
+      background: var(--safe); color: white;
+      font-size: 8px; font-weight: 700;
+      padding: 2px 5px; border-radius: 6px;
+      white-space: nowrap;
+    }
+
+    /* Splash screen */
+    .splash {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column;
+      background: linear-gradient(170deg, var(--green-dark) 0%, var(--green) 40%, var(--orange) 100%);
+      color: white;
+    }
+    .splash.hidden { display: none; }
+    .splash-content {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 30px 20px; text-align: center;
+    }
+    .splash h1 { font-size: 48px; font-weight: 800; letter-spacing: -1px; }
+    .splash-sub { font-size: 14px; opacity: 0.85; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; }
+    .splash-desc {
+      margin-top: 32px; padding: 20px; background: rgba(255,255,255,0.12);
+      border-radius: 20px; max-width: 300px; font-size: 15px; line-height: 1.6;
+    }
+    .splash-note {
+      margin-top: 20px; padding: 14px 18px; background: rgba(255,255,255,0.08);
+      border-radius: 16px; max-width: 300px; font-size: 13px; line-height: 1.6;
+      font-style: italic; text-align: left;
+    }
+    .splash-actions { padding: 0 30px 50px; text-align: center; }
+    .btn-primary {
+      width: 100%; max-width: 300px; padding: 16px; border-radius: 16px;
+      border: none; background: white; color: var(--green-dark);
+      font-size: 17px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .btn-primary:active { transform: scale(0.97); }
+    .splash-legal-btn {
+      background: none; border: none; color: rgba(255,255,255,0.7);
+      font-size: 12px; cursor: pointer; padding: 12px; text-decoration: underline;
+    }
+    .splash-legal {
+      background: rgba(0,0,0,0.25); border-radius: 12px; padding: 16px;
+      max-width: 300px; font-size: 11px; line-height: 1.5; text-align: left;
+      margin: 8px auto 0;
+    }
+
+    /* Auth screen */
+    .auth-screen {
+      position: fixed; inset: 0; z-index: 9998;
+      display: flex; flex-direction: column;
+      background: var(--cream);
+    }
+    .auth-screen.hidden { display: none; }
+    .auth-header {
+      background: linear-gradient(135deg, var(--green-dark), var(--green));
+      padding: 60px 30px 30px; color: white; text-align: center;
+      border-radius: 0 0 30px 30px;
+    }
+    .auth-header h2 { font-size: 28px; font-weight: 800; margin-bottom: 4px; }
+    .auth-header p { opacity: 0.8; font-size: 14px; }
+    .auth-form { padding: 30px; flex: 1; }
+    .auth-form input {
+      width: 100%; padding: 14px 16px; border-radius: 14px;
+      border: 2px solid var(--border); background: white;
+      font-size: 15px; margin-bottom: 12px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .auth-form input:focus { border-color: var(--green); }
+    .auth-submit {
+      width: 100%; padding: 16px; border-radius: 14px;
+      border: none; background: var(--green); color: white;
+      font-size: 16px; font-weight: 700; cursor: pointer;
+      margin-top: 8px;
+    }
+    .auth-submit:active { opacity: 0.9; }
+    .auth-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .auth-toggle {
+      text-align: center; margin-top: 20px; font-size: 14px; color: var(--text-light);
+    }
+    .auth-toggle button {
+      background: none; border: none; color: var(--green);
+      font-weight: 700; cursor: pointer; font-size: 14px;
+    }
+    .auth-error {
+      background: var(--danger-bg); color: var(--danger);
+      padding: 10px 14px; border-radius: 10px; font-size: 13px;
+      margin-bottom: 12px; display: none;
+    }
+
+    /* Search bar */
+    .search-bar {
+      position: absolute; top: 50px; left: 16px; right: 16px; z-index: 1000;
+      display: flex; gap: 10px;
+    }
+    .search-input-wrap {
+      flex: 1; display: flex; align-items: center; gap: 8px;
+      background: white; border-radius: 14px; padding: 10px 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .search-input-wrap input {
+      flex: 1; border: none; outline: none; font-size: 14px; background: none;
+    }
+    .profile-btn {
+      width: 42px; height: 42px; border-radius: 14px; border: none;
+      background: white; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      cursor: pointer; font-size: 16px;
+    }
+
+    /* Spot count */
+    .spot-count {
+      position: absolute; top: 104px; left: 16px; z-index: 1000;
+      background: white; border-radius: 12px; padding: 6px 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      font-size: 12px; font-weight: 600;
+    }
+
+    /* Filter bar */
+    .filter-bar {
+      position: absolute; bottom: 90px; left: 12px; right: 12px; z-index: 1000;
+      display: flex; justify-content: center;
+    }
+    .filter-bar-inner {
+      display: flex; gap: 6px; padding: 8px 12px;
+      background: white; border-radius: 20px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+    }
+    .filter-btn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 8px 12px; border-radius: 14px; border: none;
+      cursor: pointer; font-size: 12px; font-weight: 600;
+      transition: all 0.2s;
+    }
+    .filter-btn.active { opacity: 1; }
+    .filter-btn.inactive { opacity: 0.4; background: #F5F2ED !important; color: var(--text-light) !important; }
+    .filter-btn span.emoji { font-size: 15px; }
+
+    /* FAB */
+    .fab {
+      position: absolute; right: 20px; bottom: 180px; z-index: 1000;
+      width: 52px; height: 52px; border-radius: 50%; border: none;
+      background: var(--orange); color: white; font-size: 28px;
+      cursor: pointer; box-shadow: 0 4px 16px rgba(232,134,58,0.4);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .fab:active { transform: scale(0.95); }
+
+    /* Bottom nav */
+    .bottom-nav {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 80px; background: white;
+      border-top: 1px solid var(--border);
+      display: flex; align-items: flex-start; justify-content: space-around;
+      padding-top: 8px; z-index: 1000;
+    }
+    .nav-btn {
+      background: none; border: none; cursor: pointer;
+      text-align: center; padding: 4px 12px;
+    }
+    .nav-btn .icon { font-size: 22px; }
+    .nav-btn .label { font-size: 10px; margin-top: 2px; font-weight: 600; }
+    .nav-btn.active .label { color: var(--green); font-weight: 700; }
+    .nav-btn.inactive .label { color: var(--text-muted); }
+    .nav-btn-center {
+      background: var(--green); border: none; cursor: pointer;
+      width: 52px; height: 52px; border-radius: 50%; margin-top: -18px;
+      box-shadow: 0 4px 16px rgba(74,124,89,0.4);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .nav-btn-center .icon { font-size: 24px; }
+
+    /* Detail sheet */
+    .detail-overlay {
+      position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,0.3);
+    }
+    .detail-overlay.hidden { display: none; }
+    .detail-sheet {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: white; border-radius: 24px 24px 0 0;
+      box-shadow: 0 -4px 30px rgba(0,0,0,0.12);
+      max-height: 80vh; overflow-y: auto;
+      animation: slideUp 0.3s ease-out;
+      -webkit-overflow-scrolling: touch;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .detail-handle {
+      display: flex; justify-content: center; padding: 12px 0 4px;
+    }
+    .detail-handle div { width: 40px; height: 4px; border-radius: 2px; background: var(--border); }
+    .detail-close {
+      position: absolute; top: 16px; right: 16px;
+      width: 32px; height: 32px; border-radius: 50%;
+      border: none; background: var(--cream); font-size: 16px; cursor: pointer;
+    }
+    .detail-body { padding: 8px 24px 100px; }
+    .detail-header { display: flex; gap: 14px; margin-bottom: 16px; }
+    .detail-icon {
+      width: 52px; height: 52px; border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; flex-shrink: 0;
+    }
+    .detail-title { font-size: 20px; font-weight: 700; margin: 0; }
+    .detail-scientific { font-size: 13px; color: var(--text-light); font-style: italic; margin-top: 2px; }
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .badge {
+      padding: 5px 10px; border-radius: 10px;
+      font-size: 12px; font-weight: 600;
+    }
+    .badge-safe { background: var(--safe-bg); color: var(--safe); }
+    .badge-caution { background: var(--caution-bg); color: var(--caution); }
+    .badge-danger { background: var(--danger-bg); color: var(--danger); }
+    .info-row { display: flex; gap: 8px; margin-bottom: 16px; }
+    .info-card {
+      flex: 1; padding: 10px 12px; background: var(--cream); border-radius: 12px;
+    }
+    .info-card .label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+    .info-card .value { font-size: 13px; font-weight: 600; }
+    .uses-box {
+      padding: 12px 14px; border-radius: 14px; margin-bottom: 16px;
+    }
+    .uses-box .uses-title { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+    .uses-box p { font-size: 13px; line-height: 1.5; margin: 0; }
+    .safety-warning {
+      padding: 12px 14px; border-radius: 14px; margin-bottom: 16px;
+      background: var(--caution-bg); border: 1px solid #FFE082;
+    }
+    .comment-section h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+    .comment-item {
+      padding: 10px 14px; background: var(--cream); border-radius: 12px;
+      margin-bottom: 8px;
+    }
+    .comment-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .comment-user { font-size: 13px; font-weight: 600; }
+    .comment-time { font-size: 11px; color: var(--text-muted); }
+    .comment-text { font-size: 13px; line-height: 1.5; }
+    .comment-input-wrap {
+      display: flex; gap: 8px; margin-top: 12px;
+    }
+    .comment-input {
+      flex: 1; padding: 10px 14px; border-radius: 12px;
+      border: 2px solid var(--border); font-size: 13px; outline: none;
+    }
+    .comment-input:focus { border-color: var(--green); }
+    .comment-send {
+      padding: 10px 16px; border-radius: 12px; border: none;
+      background: var(--green); color: white; font-weight: 700;
+      font-size: 13px; cursor: pointer;
+    }
+    .detail-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .action-primary {
+      flex: 1; padding: 14px; border-radius: 14px; border: none;
+      background: var(--green); color: white; font-size: 14px;
+      font-weight: 700; cursor: pointer;
+    }
+    .action-secondary {
+      padding: 14px 18px; border-radius: 14px;
+      border: 2px solid var(--border); background: white;
+      font-size: 14px; cursor: pointer;
+    }
+    .added-by {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; background: var(--cream); border-radius: 12px;
+      margin-bottom: 16px;
+    }
+    .added-by-label { font-size: 12px; color: var(--text-muted); }
+    .added-by-name { font-size: 13px; font-weight: 600; }
+
+    /* Add spot form */
+    .add-form {
+      position: fixed; inset: 0; z-index: 3000;
+      background: var(--cream);
+      overflow-y: auto;
+    }
+    .add-form.hidden { display: none; }
+    .add-form-header {
+      background: linear-gradient(135deg, var(--green-dark), var(--green));
+      padding: 50px 24px 24px; color: white;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .add-form-header h2 { font-size: 22px; font-weight: 700; }
+    .add-form-back {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(255,255,255,0.2); border: none;
+      color: white; font-size: 18px; cursor: pointer;
+    }
+    .add-form-body { padding: 24px; }
+    .form-group { margin-bottom: 16px; }
+    .form-label { font-size: 14px; font-weight: 600; margin-bottom: 6px; display: block; }
+    .form-input {
+      width: 100%; padding: 12px 14px; border-radius: 12px;
+      border: 2px solid var(--border); font-size: 14px; outline: none;
+      background: white;
+    }
+    .form-input:focus { border-color: var(--green); }
+    .form-select {
+      width: 100%; padding: 12px 14px; border-radius: 12px;
+      border: 2px solid var(--border); font-size: 14px; outline: none;
+      background: white; appearance: none;
+    }
+    .form-select:focus { border-color: var(--green); }
+    .category-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+    .category-option {
+      padding: 10px 16px; border-radius: 12px;
+      border: 2px solid var(--border); background: white;
+      cursor: pointer; font-size: 13px; font-weight: 600;
+      display: flex; align-items: center; gap: 6px;
+      transition: all 0.2s;
+    }
+    .category-option.selected { border-color: var(--green); background: var(--green-light); }
+    .property-picker { display: flex; flex-direction: column; gap: 8px; }
+    .property-option {
+      padding: 12px 16px; border-radius: 12px;
+      border: 2px solid var(--border); background: white;
+      cursor: pointer; font-size: 13px;
+      display: flex; align-items: center; gap: 10px;
+      transition: all 0.2s;
+    }
+    .property-option.selected { border-color: var(--green); background: var(--green-light); }
+    .property-option .prop-icon { font-size: 18px; }
+    .form-submit {
+      width: 100%; padding: 16px; border-radius: 14px; border: none;
+      background: var(--green); color: white; font-size: 16px;
+      font-weight: 700; cursor: pointer; margin-top: 8px;
+    }
+    .form-submit:disabled { opacity: 0.5; }
+
+    /* Profile screen */
+    .profile-screen {
+      position: fixed; inset: 0; z-index: 3000;
+      background: var(--cream); overflow-y: auto;
+    }
+    .profile-screen.hidden { display: none; }
+    .profile-header {
+      background: linear-gradient(135deg, var(--green-dark), var(--green));
+      padding: 50px 24px 30px; color: white; text-align: center;
+      border-radius: 0 0 30px 30px; position: relative;
+    }
+    .profile-back {
+      position: absolute; top: 50px; left: 20px;
+      background: rgba(255,255,255,0.2); border: none;
+      color: white; width: 36px; height: 36px; border-radius: 50%;
+      font-size: 16px; cursor: pointer;
+    }
+    .profile-avatar {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: rgba(255,255,255,0.2); margin: 0 auto 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; border: 3px solid rgba(255,255,255,0.4);
+    }
+    .profile-name { font-size: 22px; font-weight: 700; }
+    .profile-location { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+    .profile-stats {
+      display: flex; gap: 8px; padding: 20px 20px 0; justify-content: center;
+    }
+    .stat-card {
+      flex: 1; text-align: center; padding: 14px 6px;
+      background: white; border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .stat-num { font-size: 20px; font-weight: 800; color: var(--green); }
+    .stat-label { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+    .badges-section { padding: 24px 20px; }
+    .badges-section h3 { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+    .badge-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border-radius: 14px; margin-bottom: 8px;
+    }
+    .badge-item.earned { background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .badge-item.locked { background: #F5F2ED; opacity: 0.45; }
+    .badge-icon { font-size: 24px; }
+    .badge-name { font-size: 14px; font-weight: 600; }
+    .badge-desc { font-size: 12px; color: var(--text-light); }
+    .badge-earned { margin-left: auto; font-size: 12px; color: var(--safe); font-weight: 600; }
+    .logout-btn {
+      margin: 8px 20px 40px; padding: 14px; border-radius: 14px;
+      border: 2px solid var(--danger); background: white;
+      color: var(--danger); font-size: 14px; font-weight: 600;
+      cursor: pointer; width: calc(100% - 40px);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed; top: 50px; left: 16px; right: 16px; z-index: 5000;
+      background: var(--green-dark); color: white; padding: 14px 18px;
+      border-radius: 16px; font-size: 13px; font-weight: 600;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      display: flex; align-items: center; gap: 10px;
+      animation: slideDown 0.3s ease-out;
+    }
+    .toast.hidden { display: none; }
+    @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    /* Loading spinner */
+    .spinner {
+      width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: white; border-radius: 50%;
+      animation: spin 0.6s linear infinite; display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Availability updater */
+    .status-updater { display: flex; gap: 6px; margin: 12px 0; }
+    .status-btn {
+      flex: 1; padding: 8px; border-radius: 10px;
+      border: 2px solid var(--border); background: white;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .status-btn.active-plenty { border-color: var(--safe); background: var(--safe-bg); color: var(--safe); }
+    .status-btn.active-some { border-color: var(--caution); background: var(--caution-bg); color: var(--caution); }
+    .status-btn.active-picked { border-color: var(--danger); background: var(--danger-bg); color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    // ============================
+    // Supabase config
+    // ============================
+    const SUPABASE_URL = 'https://algqrxkvxlsgxwbpgopi.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsZ3FyeGt2eGxzZ3h3YnBnb3BpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwODcyNjYsImV4cCI6MjA5MDY2MzI2Nn0.bIFMgsGqvz0cuDgzkYsV0G5jzarTsIfol4yFg-I1ssE';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ============================
+    // App State
+    // ============================
+    let state = {
+      screen: 'splash', // splash, auth, map
+      authMode: 'signup', // signup, login
+      user: null,
+      spots: [],
+      selectedSpot: null,
+      comments: [],
+      filters: { fruit: true, herb: true, flower: true, other: true },
+      showAddForm: false,
+      showProfile: false,
+      toast: null,
+      loading: false,
+      userLocation: { lat: 34.0782, lng: -118.2606 }, // Default: Echo Park
+    };
+
+    let map = null;
+    let markers = [];
+
+    // ============================
+    // Category config
+    // ============================
+    const CATEGORIES = {
+      fruit: { icon: '🍊', label: 'Fruit', color: '#E8863A', lightBg: 'var(--orange-light)', pinColor: '#E8863A' },
+      herb: { icon: '🌿', label: 'Herbs', color: '#4A7C59', lightBg: 'var(--green-light)', pinColor: '#4A7C59' },
+      flower: { icon: '🌸', label: 'Flowers', color: '#D4728C', lightBg: 'var(--pink-light)', pinColor: '#D4728C' },
+      other: { icon: '🍄', label: 'Other', color: '#8B6F47', lightBg: 'var(--brown-light)', pinColor: '#8B6F47' },
+    };
+
+    const PROPERTY_TYPES = {
+      public: { icon: '🌳', label: 'Public land' },
+      overhanging: { icon: '🏡', label: 'Overhanging to sidewalk' },
+      homeowner: { icon: '🎁', label: 'Homeowner shared' },
+    };
+
+    const STATUS_CONFIG = {
+      plenty: { label: 'Plenty available', color: 'var(--safe)', bg: 'var(--safe-bg)' },
+      some: { label: 'Some left', color: 'var(--caution)', bg: 'var(--caution-bg)' },
+      picked: { label: 'Picked over', color: 'var(--danger)', bg: 'var(--danger-bg)' },
+    };
+
+    const SAFETY_CONFIG = {
+      safe: { icon: '✅', label: 'Safe to forage', cssClass: 'badge-safe' },
+      caution: { icon: '⚠️', label: 'Use caution', cssClass: 'badge-caution' },
+      toxic: { icon: '❌', label: 'Toxic — Do not eat', cssClass: 'badge-danger' },
+    };
+
+    const BADGES = [
+      { icon: '🌱', name: 'First Find', desc: 'Found your first forage spot' },
+      { icon: '🗺️', name: 'Trailblazer', desc: 'Added 5 new spots' },
+      { icon: '🚶', name: 'Wanderer', desc: 'Walked 10 miles foraging' },
+      { icon: '🍋', name: 'Citrus Scout', desc: 'Found 10 citrus trees' },
+      { icon: '🫖', name: 'Tea Time', desc: 'Foraged 5 tea plants' },
+      { icon: '🌸', name: 'Petal Pusher', desc: 'Found 10 flower spots' },
+      { icon: '🎁', name: 'Good Neighbor', desc: 'Shared from your yard' },
+      { icon: '👀', name: 'Eagle Eye', desc: 'Reported 5 corrections' },
+      { icon: '🏆', name: 'LoFo Legend', desc: 'All badges earned' },
+    ];
+
+    // ============================
+    // Check if user is already signed in
+    // ============================
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        state.user = session.user;
+        state.screen = 'map';
+        render();
+        initMap();
+        loadSpots();
+      }
+    }
+
+    // ============================
+    // Auth
+    // ============================
+    async function handleAuth(e) {
+      e.preventDefault();
+      const form = e.target;
+      const email = form.email.value;
+      const password = form.password.value;
+      const name = form.displayName?.value || '';
+
+      state.loading = true;
+      render();
+
+      let result;
+      if (state.authMode === 'signup') {
+        result = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { display_name: name } }
+        });
+      } else {
+        result = await supabase.auth.signInWithPassword({ email, password });
+      }
+
+      state.loading = false;
+
+      if (result.error) {
+        document.getElementById('auth-error').textContent = result.error.message;
+        document.getElementById('auth-error').style.display = 'block';
+        render();
+        return;
+      }
+
+      state.user = result.data.user;
+      state.screen = 'map';
+      render();
+      initMap();
+      loadSpots();
+      showToast('Welcome to LoFo! 🌿');
+    }
+
+    async function logout() {
+      await supabase.auth.signOut();
+      state.user = null;
+      state.screen = 'auth';
+      state.showProfile = false;
+      if (map) { map.remove(); map = null; }
+      render();
+    }
+
+    // ============================
+    // Data
+    // ============================
+    async function loadSpots() {
+      const { data, error } = await supabase
+        .from('spots')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (data) {
+        state.spots = data;
+        updateMapPins();
+      }
+    }
+
+    async function addSpot(spotData) {
+      const { data, error } = await supabase
+        .from('spots')
+        .insert([{
+          ...spotData,
+          user_id: state.user.id,
+          user_name: state.user.user_metadata?.display_name || state.user.email.split('@')[0],
+        }])
+        .select();
+
+      if (error) {
+        showToast('Error adding spot: ' + error.message);
+        return;
+      }
+
+      state.spots.unshift(data[0]);
+      state.showAddForm = false;
+      updateMapPins();
+      render();
+      showToast('New forage spot added! 🌱');
+    }
+
+    async function loadComments(spotId) {
+      const { data } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('spot_id', spotId)
+        .order('created_at', { ascending: true });
+
+      state.comments = data || [];
+      renderDetailSheet();
+    }
+
+    async function addComment(spotId, text) {
+      const userName = state.user.user_metadata?.display_name || state.user.email.split('@')[0];
+      const { data, error } = await supabase
+        .from('comments')
+        .insert([{
+          spot_id: spotId,
+          user_id: state.user.id,
+          user_name: userName,
+          text: text,
+        }])
+        .select();
+
+      if (data) {
+        state.comments.push(data[0]);
+        renderDetailSheet();
+      }
+    }
+
+    async function updateSpotStatus(spotId, newStatus) {
+      await supabase
+        .from('spots')
+        .update({ status: newStatus })
+        .eq('id', spotId);
+
+      const spot = state.spots.find(s => s.id === spotId);
+      if (spot) spot.status = newStatus;
+      if (state.selectedSpot?.id === spotId) state.selectedSpot.status = newStatus;
+      renderDetailSheet();
+    }
+
+    // ============================
+    // Map
+    // ============================
+    function initMap() {
+      if (map) return;
+
+      // Try to get user's real location
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            state.userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            if (map) map.setView([state.userLocation.lat, state.userLocation.lng], 15);
+          },
+          () => {} // Fail silently, use default
+        );
+      }
+
+      setTimeout(() => {
+        map = L.map('map', {
+          zoomControl: false,
+          attributionControl: false,
+        }).setView([state.userLocation.lat, state.userLocation.lng], 15);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+        }).addTo(map);
+
+        // User location marker
+        L.circleMarker([state.userLocation.lat, state.userLocation.lng], {
+          radius: 8, color: '#4A90D9', fillColor: '#4A90D9',
+          fillOpacity: 1, weight: 3, opacity: 1,
+          className: 'user-dot',
+        }).addTo(map);
+
+        // Listen for map clicks when adding
+        map.on('click', (e) => {
+          if (state.showAddForm) {
+            document.getElementById('add-lat').value = e.latlng.lat.toFixed(6);
+            document.getElementById('add-lng').value = e.latlng.lng.toFixed(6);
+          }
+        });
+
+        updateMapPins();
+      }, 100);
+    }
+
+    function createPinIcon(category, ripeNow) {
+      const cat = CATEGORIES[category] || CATEGORIES.other;
+      return L.divIcon({
+        className: 'lofo-pin',
+        iconSize: [36, 44],
+        iconAnchor: [18, 44],
+        popupAnchor: [0, -44],
+        html: `
+          <div class="pin-inner">
+            <svg width="36" height="44" viewBox="0 0 32 40">
+              <path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 24 16 24s16-12 16-24C32 7.16 24.84 0 16 0z" fill="${cat.pinColor}" />
+            </svg>
+            <span class="pin-emoji">${cat.icon}</span>
+            ${ripeNow ? '<span class="pin-ripe">RIPE</span>' : ''}
+          </div>
+        `,
+      });
+    }
+
+    function updateMapPins() {
+      if (!map) return;
+
+      // Remove old markers
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+
+      const filtered = state.spots.filter(s => state.filters[s.category]);
+
+      filtered.forEach(spot => {
+        const icon = createPinIcon(spot.category, spot.ripe_now);
+        const marker = L.marker([spot.lat, spot.lng], { icon })
+          .addTo(map)
+          .on('click', () => {
+            state.selectedSpot = spot;
+            loadComments(spot.id);
+            render();
+          });
+        markers.push(marker);
+      });
+
+      // Update spot count
+      const countEl = document.getElementById('spot-count');
+      if (countEl) countEl.textContent = `${filtered.length} spots nearby`;
+    }
+
+    // ============================
+    // Rendering
+    // ============================
+    function render() {
+      const app = document.getElementById('app');
+
+      if (state.screen === 'splash') {
+        app.innerHTML = renderSplash();
+        return;
+      }
+
+      if (state.screen === 'auth') {
+        app.innerHTML = renderAuth();
+        setupAuthListeners();
+        return;
+      }
+
+      // Map screen
+      app.innerHTML = `
+        <div id="map"></div>
+        ${renderSearchBar()}
+        <div class="spot-count" id="spot-count">${getFilteredSpots().length} spots nearby</div>
+        ${renderFilterBar()}
+        <button class="fab" id="fab-add" title="Add spot">+</button>
+        ${renderBottomNav()}
+        ${renderDetailOverlay()}
+        ${state.showAddForm ? renderAddForm() : ''}
+        ${state.showProfile ? renderProfile() : ''}
+        ${state.toast ? renderToast() : ''}
+      `;
+
+      setupMapListeners();
+    }
+
+    function getFilteredSpots() {
+      return state.spots.filter(s => state.filters[s.category]);
+    }
+
+    function renderSplash() {
+      return `
+        <div class="splash" id="splash">
+          <div class="splash-content">
+            <div style="font-size:64px;margin-bottom:8px">🌿</div>
+            <h1>LoFo</h1>
+            <p class="splash-sub">Local Forage</p>
+            <div class="splash-desc">
+              Discover fruit trees, tea plants, edible flowers & herbs in your neighborhood. Share spots, walk routes, and forage together.
+            </div>
+            <div class="splash-note">
+              "Take only what you need, leave some for your neighbors, and always respect private property."
+            </div>
+          </div>
+          <div class="splash-actions">
+            <button class="btn-primary" id="splash-agree">Let's Forage 🌱</button>
+            <br>
+            <button class="splash-legal-btn" id="splash-legal-toggle">View terms & safety disclaimer</button>
+            <div class="splash-legal" id="splash-legal" style="display:none">
+              By using LoFo, you acknowledge that plant identification is provided as guidance only. Always verify edibility independently. LoFo is not responsible for allergic reactions, misidentification, or any health issues. Always respect private property. Foraging from private land without permission is trespassing. Be mindful of local regulations regarding plant harvesting in public spaces.
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAuth() {
+      const isSignup = state.authMode === 'signup';
+      return `
+        <div class="auth-screen">
+          <div class="auth-header">
+            <div style="font-size:40px;margin-bottom:8px">🌿</div>
+            <h2>${isSignup ? 'Join LoFo' : 'Welcome Back'}</h2>
+            <p>${isSignup ? 'Create your account to start foraging' : 'Sign in to continue foraging'}</p>
+          </div>
+          <form class="auth-form" id="auth-form">
+            <div class="auth-error" id="auth-error"></div>
+            ${isSignup ? '<input type="text" name="displayName" placeholder="Your name" required>' : ''}
+            <input type="email" name="email" placeholder="Email address" required>
+            <input type="password" name="password" placeholder="Password (6+ characters)" minlength="6" required>
+            <button type="submit" class="auth-submit" id="auth-submit">
+              ${state.loading ? '<span class="spinner"></span>' : (isSignup ? 'Create Account' : 'Sign In')}
+            </button>
+            <div class="auth-toggle">
+              ${isSignup ? 'Already have an account?' : "Don't have an account?"}
+              <button type="button" id="auth-toggle-btn">
+                ${isSignup ? 'Sign In' : 'Sign Up'}
+              </button>
+            </div>
+          </form>
+        </div>
+      `;
+    }
+
+    function renderSearchBar() {
+      return `
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <span>🔍</span>
+            <input type="text" placeholder="Search plants..." id="search-input">
+          </div>
+          <button class="profile-btn" id="profile-btn">👤</button>
+        </div>
+      `;
+    }
+
+    function renderFilterBar() {
+      const filters = [
+        { key: 'fruit', icon: '🍊', label: 'Fruit', color: 'var(--orange)', bg: 'var(--orange-light)' },
+        { key: 'herb', icon: '🌿', label: 'Herbs', color: 'var(--green)', bg: 'var(--green-light)' },
+        { key: 'flower', icon: '🌸', label: 'Flowers', color: 'var(--pink)', bg: 'var(--pink-light)' },
+        { key: 'other', icon: '🍄', label: 'Other', color: 'var(--brown)', bg: 'var(--brown-light)' },
+      ];
+
+      return `
+        <div class="filter-bar">
+          <div class="filter-bar-inner">
+            ${filters.map(f => `
+              <button class="filter-btn ${state.filters[f.key] ? 'active' : 'inactive'}"
+                      data-filter="${f.key}"
+                      style="${state.filters[f.key] ? `background:${f.bg};color:${f.color}` : ''}">
+                <span class="emoji">${f.icon}</span>
+                <span>${f.label}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderBottomNav() {
+      return `
+        <div class="bottom-nav">
+          <button class="nav-btn active"><div class="icon">🗺️</div><div class="label">Map</div></button>
+          <button class="nav-btn inactive"><div class="icon">🚶</div><div class="label">Routes</div></button>
+          <button class="nav-btn-center" id="nav-add"><div class="icon">📸</div></button>
+          <button class="nav-btn inactive"><div class="icon">🔔</div><div class="label">Alerts</div></button>
+          <button class="nav-btn inactive" id="nav-profile"><div class="icon">👤</div><div class="label">Profile</div></button>
+        </div>
+      `;
+    }
+
+    function renderDetailOverlay() {
+      if (!state.selectedSpot) return '<div class="detail-overlay hidden"></div>';
+      const spot = state.selectedSpot;
+      const cat = CATEGORIES[spot.category] || CATEGORIES.other;
+      const safety = SAFETY_CONFIG[spot.safety_level] || SAFETY_CONFIG.safe;
+      const status = STATUS_CONFIG[spot.status] || STATUS_CONFIG.plenty;
+      const property = PROPERTY_TYPES[spot.property_type] || PROPERTY_TYPES.public;
+
+      return `
+        <div class="detail-overlay" id="detail-overlay">
+          <div class="detail-sheet">
+            <div class="detail-handle"><div></div></div>
+            <button class="detail-close" id="detail-close">✕</button>
+            <div class="detail-body">
+              <div class="detail-header">
+                <div class="detail-icon" style="background:${cat.lightBg}">
+                  ${cat.icon}
+                </div>
+                <div>
+                  <h2 class="detail-title">${spot.plant_name}</h2>
+                  <p class="detail-scientific">${spot.scientific_name || ''}</p>
+                </div>
+              </div>
+
+              <div class="badge-row">
+                <span class="badge ${safety.cssClass}">${safety.icon} ${safety.label}</span>
+                <span class="badge" style="background:${status.bg};color:${status.color}">${status.label}</span>
+                ${spot.ripe_now ? '<span class="badge badge-safe">✨ Ripe now!</span>' : ''}
+              </div>
+
+              <div class="info-row">
+                <div class="info-card">
+                  <div class="label">Season</div>
+                  <div class="value">📅 ${spot.season || 'Year-round'}</div>
+                </div>
+                <div class="info-card">
+                  <div class="label">Property</div>
+                  <div class="value">${property.icon} ${property.label}</div>
+                </div>
+              </div>
+
+              ${spot.description ? `<p style="font-size:14px;line-height:1.6;margin-bottom:16px">${spot.description}</p>` : ''}
+
+              ${spot.uses ? `
+                <div class="uses-box" style="background:${cat.lightBg}">
+                  <div class="uses-title" style="color:${cat.color}">${cat.icon} What you can make</div>
+                  <p>${spot.uses}</p>
+                </div>
+              ` : ''}
+
+              ${spot.safety_level === 'caution' ? `
+                <div class="safety-warning">
+                  <div style="font-size:12px;font-weight:700;color:var(--caution);margin-bottom:4px">⚠️ Safety Note</div>
+                  <p style="font-size:13px;line-height:1.5;margin:0">
+                    Always verify identification before consuming. This plant has lookalikes or requires careful preparation. When in doubt, don't eat it.
+                  </p>
+                </div>
+              ` : ''}
+
+              <div style="margin-bottom:12px">
+                <div style="font-size:12px;font-weight:700;margin-bottom:6px">Update availability:</div>
+                <div class="status-updater">
+                  <button class="status-btn ${spot.status === 'plenty' ? 'active-plenty' : ''}" data-status="plenty">Plenty</button>
+                  <button class="status-btn ${spot.status === 'some' ? 'active-some' : ''}" data-status="some">Some left</button>
+                  <button class="status-btn ${spot.status === 'picked' ? 'active-picked' : ''}" data-status="picked">Picked over</button>
+                </div>
+              </div>
+
+              <div class="added-by">
+                <div>
+                  <span class="added-by-label">Added by </span>
+                  <span class="added-by-name">${spot.user_name || 'Unknown'}</span>
+                </div>
+              </div>
+
+              <div class="comment-section" id="comments-section">
+                <h3>💬 Tips & Comments (${state.comments.length})</h3>
+                ${state.comments.map(c => `
+                  <div class="comment-item">
+                    <div class="comment-header">
+                      <span class="comment-user">${c.user_name}</span>
+                      <span class="comment-time">${timeAgo(c.created_at)}</span>
+                    </div>
+                    <p class="comment-text">${c.text}</p>
+                  </div>
+                `).join('')}
+                <div class="comment-input-wrap">
+                  <input type="text" class="comment-input" id="comment-input" placeholder="Add a tip or comment...">
+                  <button class="comment-send" id="comment-send">Post</button>
+                </div>
+              </div>
+
+              <div class="detail-actions">
+                <button class="action-primary" id="action-directions">🚶 Walk There</button>
+                <button class="action-secondary" id="action-report">🚩</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDetailSheet() {
+      const overlay = document.getElementById('detail-overlay');
+      if (overlay && state.selectedSpot) {
+        overlay.outerHTML = renderDetailOverlay();
+        setupDetailListeners();
+      }
+    }
+
+    function renderAddForm() {
+      return `
+        <div class="add-form" id="add-form-screen">
+          <div class="add-form-header">
+            <button class="add-form-back" id="add-form-close">←</button>
+            <h2>Add Forage Spot</h2>
+          </div>
+          <div class="add-form-body">
+            <form id="add-spot-form">
+              <div class="form-group">
+                <label class="form-label">Plant name *</label>
+                <input type="text" class="form-input" name="plant_name" placeholder="e.g., Meyer Lemon Tree" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Scientific name</label>
+                <input type="text" class="form-input" name="scientific_name" placeholder="e.g., Citrus × meyeri">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Category *</label>
+                <div class="category-picker">
+                  ${Object.entries(CATEGORIES).map(([key, cat]) => `
+                    <div class="category-option" data-cat="${key}">
+                      <span>${cat.icon}</span> ${cat.label}
+                    </div>
+                  `).join('')}
+                </div>
+                <input type="hidden" name="category" id="add-category" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Property type *</label>
+                <div class="property-picker">
+                  ${Object.entries(PROPERTY_TYPES).map(([key, prop]) => `
+                    <div class="property-option" data-prop="${key}">
+                      <span class="prop-icon">${prop.icon}</span>
+                      <span>${prop.label}</span>
+                    </div>
+                  `).join('')}
+                </div>
+                <input type="hidden" name="property_type" id="add-property" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Safety level *</label>
+                <select class="form-select" name="safety_level" required>
+                  <option value="safe">✅ Safe to forage</option>
+                  <option value="caution">⚠️ Use caution</option>
+                  <option value="toxic">❌ Toxic — Do not eat</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Season</label>
+                <input type="text" class="form-input" name="season" placeholder="e.g., Mar–Sep or Year-round">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Uses</label>
+                <input type="text" class="form-input" name="uses" placeholder="e.g., Tea, jam, cooking...">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Description / Tips</label>
+                <textarea class="form-input" name="description" rows="3" placeholder="Describe the spot, any tips..."></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Location</label>
+                <p style="font-size:12px;color:var(--text-light);margin-bottom:8px">
+                  Use your current location or enter coordinates manually
+                </p>
+                <button type="button" class="form-submit" id="use-my-location" style="background:var(--orange);margin-bottom:12px">
+                  📍 Use My Current Location
+                </button>
+                <div style="display:flex;gap:8px">
+                  <input type="text" class="form-input" id="add-lat" name="lat" placeholder="Latitude" required>
+                  <input type="text" class="form-input" id="add-lng" name="lng" placeholder="Longitude" required>
+                </div>
+              </div>
+              <div class="form-group" style="display:flex;align-items:center;gap:8px">
+                <input type="checkbox" name="ripe_now" id="ripe-check">
+                <label for="ripe-check" style="font-size:14px">Currently ripe / in season right now</label>
+              </div>
+              <button type="submit" class="form-submit" id="add-submit">
+                Add to Map 🌱
+              </button>
+            </form>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderProfile() {
+      const displayName = state.user?.user_metadata?.display_name || state.user?.email?.split('@')[0] || 'Forager';
+      const spotsAdded = state.spots.filter(s => s.user_id === state.user?.id).length;
+      const earnedBadges = [];
+      if (spotsAdded >= 1) earnedBadges.push('🌱');
+      if (spotsAdded >= 5) earnedBadges.push('🗺️');
+
+      return `
+        <div class="profile-screen">
+          <div class="profile-header">
+            <button class="profile-back" id="profile-close">←</button>
+            <div class="profile-avatar">${displayName[0].toUpperCase()}</div>
+            <div class="profile-name">${displayName}</div>
+            <div class="profile-location">Echo Park, LA</div>
+          </div>
+          <div class="profile-stats">
+            <div class="stat-card">
+              <div class="stat-num">${state.spots.length}</div>
+              <div class="stat-label">Spots Found</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-num">${spotsAdded}</div>
+              <div class="stat-label">Spots Added</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-num">0</div>
+              <div class="stat-label">Walked</div>
+            </div>
+          </div>
+          <div class="badges-section">
+            <h3>Badges</h3>
+            ${BADGES.map(b => {
+              const earned = earnedBadges.includes(b.icon);
+              return `
+                <div class="badge-item ${earned ? 'earned' : 'locked'}">
+                  <span class="badge-icon">${b.icon}</span>
+                  <div>
+                    <div class="badge-name">${b.name}</div>
+                    <div class="badge-desc">${b.desc}</div>
+                  </div>
+                  ${earned ? '<span class="badge-earned">Earned!</span>' : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <button class="logout-btn" id="logout-btn">Sign Out</button>
+        </div>
+      `;
+    }
+
+    function renderToast() {
+      return `<div class="toast" id="toast"><span>🌿</span><span>${state.toast}</span></div>`;
+    }
+
+    // ============================
+    // Event listeners
+    // ============================
+    function setupAuthListeners() {
+      document.getElementById('auth-form')?.addEventListener('submit', handleAuth);
+      document.getElementById('auth-toggle-btn')?.addEventListener('click', () => {
+        state.authMode = state.authMode === 'signup' ? 'login' : 'signup';
+        document.getElementById('auth-error').style.display = 'none';
+        render();
+      });
+    }
+
+    function setupMapListeners() {
+      // Filters
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.dataset.filter;
+          state.filters[key] = !state.filters[key];
+          updateMapPins();
+          render();
+          // Re-init map reference since render replaces DOM
+          if (!document.getElementById('map')._leaflet_id) {
+            initMap();
+          }
+        });
+      });
+
+      // FAB
+      document.getElementById('fab-add')?.addEventListener('click', () => {
+        state.showAddForm = true;
+        render();
+        setupAddFormListeners();
+      });
+
+      // Nav add button
+      document.getElementById('nav-add')?.addEventListener('click', () => {
+        state.showAddForm = true;
+        render();
+        setupAddFormListeners();
+      });
+
+      // Profile
+      document.getElementById('profile-btn')?.addEventListener('click', () => {
+        state.showProfile = true;
+        render();
+        setupProfileListeners();
+      });
+      document.getElementById('nav-profile')?.addEventListener('click', () => {
+        state.showProfile = true;
+        render();
+        setupProfileListeners();
+      });
+
+      // Detail
+      setupDetailListeners();
+    }
+
+    function setupDetailListeners() {
+      document.getElementById('detail-close')?.addEventListener('click', () => {
+        state.selectedSpot = null;
+        state.comments = [];
+        render();
+      });
+      document.getElementById('detail-overlay')?.addEventListener('click', (e) => {
+        if (e.target.id === 'detail-overlay') {
+          state.selectedSpot = null;
+          state.comments = [];
+          render();
+        }
+      });
+
+      // Comment
+      document.getElementById('comment-send')?.addEventListener('click', () => {
+        const input = document.getElementById('comment-input');
+        if (input?.value.trim()) {
+          addComment(state.selectedSpot.id, input.value.trim());
+          input.value = '';
+        }
+      });
+      document.getElementById('comment-input')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          document.getElementById('comment-send')?.click();
+        }
+      });
+
+      // Status update
+      document.querySelectorAll('.status-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (state.selectedSpot) {
+            updateSpotStatus(state.selectedSpot.id, btn.dataset.status);
+          }
+        });
+      });
+
+      // Directions
+      document.getElementById('action-directions')?.addEventListener('click', () => {
+        if (state.selectedSpot) {
+          const url = `https://www.google.com/maps/dir/?api=1&destination=${state.selectedSpot.lat},${state.selectedSpot.lng}&travelmode=walking`;
+          window.open(url, '_blank');
+        }
+      });
+    }
+
+    function setupAddFormListeners() {
+      document.getElementById('add-form-close')?.addEventListener('click', () => {
+        state.showAddForm = false;
+        render();
+      });
+
+      // Category picker
+      document.querySelectorAll('.category-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+          document.querySelectorAll('.category-option').forEach(o => o.classList.remove('selected'));
+          opt.classList.add('selected');
+          document.getElementById('add-category').value = opt.dataset.cat;
+        });
+      });
+
+      // Property picker
+      document.querySelectorAll('.property-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+          document.querySelectorAll('.property-option').forEach(o => o.classList.remove('selected'));
+          opt.classList.add('selected');
+          document.getElementById('add-property').value = opt.dataset.prop;
+        });
+      });
+
+      // Use my location
+      document.getElementById('use-my-location')?.addEventListener('click', () => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              document.getElementById('add-lat').value = pos.coords.latitude.toFixed(6);
+              document.getElementById('add-lng').value = pos.coords.longitude.toFixed(6);
+              showToast('Location captured! 📍');
+            },
+            () => showToast('Could not get location. Please enter manually.')
+          );
+        }
+      });
+
+      // Submit
+      document.getElementById('add-spot-form')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const form = e.target;
+        addSpot({
+          plant_name: form.plant_name.value,
+          scientific_name: form.scientific_name.value || null,
+          category: form.category.value,
+          property_type: form.property_type.value,
+          safety_level: form.safety_level.value,
+          season: form.season.value || null,
+          uses: form.uses.value || null,
+          description: form.description.value || null,
+          lat: parseFloat(form.lat.value),
+          lng: parseFloat(form.lng.value),
+          ripe_now: form.ripe_now.checked,
+          status: 'plenty',
+        });
+      });
+    }
+
+    function setupProfileListeners() {
+      document.getElementById('profile-close')?.addEventListener('click', () => {
+        state.showProfile = false;
+        render();
+      });
+      document.getElementById('logout-btn')?.addEventListener('click', logout);
+    }
+
+    // ============================
+    // Helpers
+    // ============================
+    function showToast(msg) {
+      state.toast = msg;
+      const existing = document.getElementById('toast');
+      if (existing) existing.remove();
+
+      const div = document.createElement('div');
+      div.className = 'toast';
+      div.id = 'toast';
+      div.innerHTML = `<span>🌿</span><span>${msg}</span>`;
+      document.body.appendChild(div);
+
+      setTimeout(() => {
+        div.remove();
+        state.toast = null;
+      }, 3000);
+    }
+
+    function timeAgo(dateStr) {
+      const now = new Date();
+      const date = new Date(dateStr);
+      const diff = Math.floor((now - date) / 1000);
+      if (diff < 60) return 'just now';
+      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+      if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+      if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+      return date.toLocaleDateString();
+    }
+
+    // ============================
+    // Global event delegation
+    // ============================
+    document.addEventListener('click', (e) => {
+      if (e.target.id === 'splash-agree') {
+        state.screen = 'auth';
+        render();
+      }
+      if (e.target.id === 'splash-legal-toggle') {
+        const legal = document.getElementById('splash-legal');
+        if (legal) legal.style.display = legal.style.display === 'none' ? 'block' : 'none';
+      }
+    });
+
+    // ============================
+    // Real-time subscriptions
+    // ============================
+    function setupRealtimeSubscriptions() {
+      supabase
+        .channel('spots-changes')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'spots' }, (payload) => {
+          if (!state.spots.find(s => s.id === payload.new.id)) {
+            state.spots.unshift(payload.new);
+            updateMapPins();
+            if (payload.new.user_id !== state.user?.id) {
+              showToast(`New spot nearby: ${payload.new.plant_name}!`);
+            }
+          }
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'spots' }, (payload) => {
+          const idx = state.spots.findIndex(s => s.id === payload.new.id);
+          if (idx >= 0) state.spots[idx] = payload.new;
+          updateMapPins();
+        })
+        .subscribe();
+    }
+
+    // ============================
+    // Init
+    // ============================
+    render();
+    checkAuth().then(() => {
+      setupRealtimeSubscriptions();
+    });
+  </script>
+</body>
+</html>

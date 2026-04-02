@@ -1,0 +1,10 @@
+{
+  "name": "LoFo — Local Forage",
+  "short_name": "LoFo",
+  "description": "Discover and share local foraging spots in your neighborhood",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF8F0",
+  "theme_color": "#2D5A3D",
+  "icons": []
+}
